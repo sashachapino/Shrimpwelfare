@@ -154,6 +154,50 @@
   gap: var(--space-xs);
 }
 
+/* Client Status Selector */
+.statusSelector {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.statusBtn {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.statusBtn:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.statusBtn.selected {
+  border-width: 2px;
+}
+
+.statusBtn.selected.active {
+  background: #dcfce7;
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+.statusBtn.selected.occasional {
+  background: #fef3c7;
+  border-color: #d97706;
+  color: #b45309;
+}
+
+.statusBtn.selected.archived {
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-text-muted);
+  color: var(--color-text-secondary);
+}
+
 .actions {
   display: flex;
   align-items: center;

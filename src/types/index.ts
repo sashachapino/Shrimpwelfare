@@ -11,6 +11,7 @@ export interface SessionNote {
 
 export type EnneagramType = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | '?';
 export type EnneagramWing = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | null;
+export type ClientStatus = 'active' | 'occasional' | 'archived';
 
 export interface Client {
   id: string;
@@ -18,6 +19,7 @@ export interface Client {
   email: string;
   enneagramType: EnneagramType;
   enneagramWing: EnneagramWing;
+  status: ClientStatus;
   sessionsCompleted: number;
   unpaidHours: number; // supports decimals (e.g., 1.5 for 1.5 hours)
   hourlyRate: number; // dollar rate per hour

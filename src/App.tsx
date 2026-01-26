@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './contexts/AppContext';
 import { LockScreen } from './components/LockScreen';
 import { ClientList } from './components/ClientList';
 import { ClientDetail } from './components/ClientDetail';
+import { ArchivedClients } from './components/ArchivedClients';
 
 function AppRoutes() {
   const { isUnlocked, loading } = useApp();
@@ -22,6 +23,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<ClientList />} />
+      <Route path="/archived" element={<ArchivedClients />} />
       <Route path="/client/:id" element={<ClientDetail />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

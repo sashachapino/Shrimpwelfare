@@ -29,6 +29,7 @@ function migrateClient(client: Partial<Client>): Client {
     email: client.email ?? '',
     enneagramType: client.enneagramType ?? '?',
     enneagramWing: client.enneagramWing ?? null,
+    status: client.status ?? 'active',
     sessionsCompleted: client.sessionsCompleted ?? 0,
     unpaidHours: client.unpaidHours ?? (client as { unpaidSessions?: number }).unpaidSessions ?? 0,
     hourlyRate: client.hourlyRate ?? 0,

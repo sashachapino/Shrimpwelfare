@@ -285,3 +285,51 @@
 .questions strong {
   color: var(--color-text-secondary);
 }
+
+/* Occasional Section */
+.occasionalSection {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px dashed var(--color-border);
+}
+
+.sectionLabel {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: var(--space-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.sectionLabel::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: #f59e0b;
+  border-radius: 50%;
+}
+
+/* Archive Button */
+.archiveBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  color: var(--color-text-secondary);
+}
+
+.archiveBtn:hover {
+  color: var(--color-text-primary);
+}
+
+.archiveCount {
+  background: var(--color-bg-tertiary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+}

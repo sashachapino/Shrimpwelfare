@@ -16,7 +16,7 @@ import { useApp } from '../contexts/AppContext';
 import { AllianceIndicator } from './AllianceIndicator';
 import { EnneagramIndicator } from './EnneagramIndicator';
 import { SessionNotes } from './SessionNotes';
-import type { Client, SessionNote, EnneagramType, EnneagramWing } from '../types';
+import type { Client, SessionNote, EnneagramType, EnneagramWing, ClientStatus } from '../types';
 import styles from './ClientDetail.module.css';
 
 const emptyClient: Omit<Client, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -24,6 +24,7 @@ const emptyClient: Omit<Client, 'id' | 'createdAt' | 'updatedAt'> = {
   email: '',
   enneagramType: '?',
   enneagramWing: null,
+  status: 'active',
   sessionsCompleted: 0,
   unpaidHours: 0,
   hourlyRate: 0,
@@ -267,6 +268,22 @@ export function ClientDetail() {
                 setFormData((prev) => ({ ...prev, enneagramType: type, enneagramWing: wing }))
               }
             />
+          </div>
+
+          <div className={styles.field}>
+            <label>Client Status</label>
+            <div className={styles.statusSelector}>
+              {(['active', 'occasional', 'archived'] as ClientStatus[]).map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  className={`${styles.statusBtn} ${formData.status === status ? styles.selected : ''} ${styles[status]}`}
+                  onClick={() => setFormData((prev) => ({ ...prev, status }))}
+                >
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 
