@@ -1,0 +1,115 @@
+.empty {
+  text-align: center;
+  padding: var(--space-lg);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.session {
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+}
+
+.sessionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-md);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-primary);
+  transition: background var(--transition-fast);
+}
+
+.sessionHeader:hover {
+  background: var(--color-bg-tertiary);
+}
+
+.sessionInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.sessionNumber {
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.sessionDate {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+}
+
+.sessionContent {
+  padding: var(--space-md);
+  padding-top: 0;
+  animation: slideDown 200ms ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sessionContent textarea {
+  background: var(--color-bg-card);
+  font-size: var(--text-sm);
+}
+
+.sessionFooter {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-sm);
+}
+
+.deleteBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: none;
+  border: none;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.deleteBtn:hover {
+  color: var(--color-error);
+  background: #fef2f2;
+}
+
+.deleteConfirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+}
+
+.deleteConfirm button {
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--text-xs);
+}
