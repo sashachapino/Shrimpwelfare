@@ -18,6 +18,7 @@ interface AppContextType {
   deleteClient: (id: string) => Promise<void>;
   getClient: (id: string) => Client | undefined;
   setAnthropicApiKey: (key: string) => Promise<void>;
+  reloadClients: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -173,6 +174,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setError(null);
   }, []);
 
+  const reloadClients = useCallback(async () => {
+    if (!password) return;
+    try {
+      const data = await loadClients(password);
+      const migratedData = data.map(migrateClient);
+      setClients(migratedData);
+      // Also reload settings
+      const settings = await loadSettings(password);
+      setAnthropicApiKeyState(settings.anthropicApiKey || null);
+    } catch (err) {
+      setError('Failed to reload data');
+    }
+  }, [password]);
+
   return (
     <AppContext.Provider
       value={{
@@ -191,6 +206,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         deleteClient,
         getClient,
         setAnthropicApiKey,
+        reloadClients,
         clearError,
       }}
     >

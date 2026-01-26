@@ -59,8 +59,8 @@ export async function loadGoogleApi(): Promise<void> {
             authCallback?.(false);
             return;
           }
-          // Store token in sessionStorage
-          sessionStorage.setItem('gapi_token', JSON.stringify({
+          // Store token in localStorage (persists across sessions)
+          localStorage.setItem('gapi_token', JSON.stringify({
             access_token: response.access_token,
             expires_at: Date.now() + (response.expires_in * 1000),
           }));
@@ -78,7 +78,7 @@ export async function loadGoogleApi(): Promise<void> {
 function maybeEnableAuth() {
   if (gapiInited && gisInited) {
     // Check for existing token
-    const storedToken = sessionStorage.getItem('gapi_token');
+    const storedToken = localStorage.getItem('gapi_token');
     if (storedToken) {
       try {
         const { access_token, expires_at } = JSON.parse(storedToken);
@@ -89,7 +89,7 @@ function maybeEnableAuth() {
         }
       } catch {
         // Invalid token, clear it
-        sessionStorage.removeItem('gapi_token');
+        localStorage.removeItem('gapi_token');
       }
     }
     authCallback?.(false);
@@ -125,7 +125,7 @@ export function signOut(): void {
   if (token) {
     google.accounts.oauth2.revoke(token.access_token, () => {
       gapi.client.setToken(null);
-      sessionStorage.removeItem('gapi_token');
+      localStorage.removeItem('gapi_token');
       authCallback?.(false);
     });
   }

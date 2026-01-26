@@ -153,3 +153,82 @@ export async function saveSettings(settings: AppSettings, password: string): Pro
 
   await setValue(SETTINGS_KEY, encrypted);
 }
+
+// Encrypted backup functions - exports data in encrypted form (safe for cloud storage)
+export interface EncryptedBackup {
+  version: number;
+  createdAt: string;
+  passwordHash: string;
+  clients: EncryptedStore | null;
+  settings: EncryptedStore | null;
+}
+
+export async function exportEncryptedBackup(): Promise<EncryptedBackup> {
+  const passwordHash = await getValue<string>(PASSWORD_HASH_KEY);
+  const clients = await getValue<EncryptedStore>(DATA_KEY);
+  const settings = await getValue<EncryptedStore>(SETTINGS_KEY);
+
+  if (!passwordHash) {
+    throw new Error('No data to export');
+  }
+
+  return {
+    version: 1,
+    createdAt: new Date().toISOString(),
+    passwordHash,
+    clients,
+    settings,
+  };
+}
+
+export async function importEncryptedBackup(backup: EncryptedBackup, password: string): Promise<void> {
+  // Verify password matches the backup
+  const hash = await hashPassword(password);
+  if (hash !== backup.passwordHash) {
+    throw new Error('Password does not match the backup. Use the password you had when the backup was created.');
+  }
+
+  // Restore password hash
+  await setValue(PASSWORD_HASH_KEY, backup.passwordHash);
+
+  // Restore clients if present
+  if (backup.clients) {
+    await setValue(DATA_KEY, backup.clients);
+  }
+
+  // Restore settings if present
+  if (backup.settings) {
+    await setValue(SETTINGS_KEY, backup.settings);
+  }
+}
+
+// Download backup file (triggers browser download)
+export async function downloadBackup(): Promise<void> {
+  const backup = await exportEncryptedBackup();
+  const json = JSON.stringify(backup, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const date = new Date().toISOString().split('T')[0];
+  const filename = `coaching-crm-backup-${date}.json`;
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Restore from backup file
+export async function restoreFromBackup(file: File, password: string): Promise<void> {
+  const text = await file.text();
+  const backup = JSON.parse(text) as EncryptedBackup;
+
+  if (!backup.version || !backup.passwordHash) {
+    throw new Error('Invalid backup file format');
+  }
+
+  await importEncryptedBackup(backup, password);
+}

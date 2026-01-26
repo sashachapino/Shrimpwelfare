@@ -96,10 +96,17 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
             <h3>Review Anonymized Data</h3>
           </div>
 
-          <p className={styles.previewWarning}>
-            The following anonymized data will be sent to Anthropic's servers.
-            Please review and confirm no identifying information remains.
-          </p>
+          <div className={styles.previewWarning}>
+            <p>
+              <strong>Before sending:</strong> Review the anonymized data below.
+              Confirm no identifying information remains.
+            </p>
+            <p className={styles.retentionNote}>
+              <strong>Data retention:</strong> Anthropic may retain API data for up to 30 days
+              for safety monitoring. They do not use API data for training.
+              {' '}<a href="https://support.anthropic.com/en/articles/7996866-how-long-do-you-store-personal-data" target="_blank" rel="noopener noreferrer">Learn more</a>
+            </p>
+          </div>
 
           {preview.anonymizedData.allReplacements.length > 0 && (
             <div className={styles.replacementsList}>

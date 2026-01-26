@@ -311,8 +311,8 @@ function escapeRegex(string: string): string {
 
 // Anonymize full client data for API request
 export interface AnonymizedClientData {
-  enneagramType: string;
-  enneagramWing: string;
+  enneagramType: string | number;
+  enneagramWing: string | number | null;
   sessionsCompleted: number;
   allianceStrength: number;
   overallNotes: string;
@@ -323,8 +323,8 @@ export interface AnonymizedClientData {
 
 export function anonymizeClientData(client: {
   name: string;
-  enneagramType: string;
-  enneagramWing: string;
+  enneagramType: string | number;
+  enneagramWing: string | number | null;
   sessionsCompleted: number;
   allianceStrength: number;
   overallNotes: string;
@@ -342,7 +342,7 @@ export function anonymizeClientData(client: {
   allReplacements.push(...questionsResult.replacements);
 
   // Anonymize session notes (strip dates, keep session numbers)
-  const anonymizedSessions = client.sessionNotes.map((session, index) => {
+  const anonymizedSessions = client.sessionNotes.map((session) => {
     const sessionResult = anonymizeText(session.notes || '', client.name);
     allReplacements.push(...sessionResult.replacements.map(r => `Session ${session.sessionNumber}: ${r}`));
     return {

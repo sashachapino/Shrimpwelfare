@@ -1,12 +1,13 @@
 import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive } from 'lucide-react';
+import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive, Settings, Download, Upload, X } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useCalendar } from '../contexts/CalendarContext';
 import { AllianceIndicator } from './AllianceIndicator';
 import { EnneagramIndicator } from './EnneagramIndicator';
 import { UpcomingCalls } from './UpcomingCalls';
 import { PostCallNotifications } from './PostCallNotifications';
+import { downloadBackup, restoreFromBackup } from '../utils/storage';
 import type { Client } from '../types';
 import styles from './ClientList.module.css';
 
@@ -61,15 +62,51 @@ function ClientCard({ client }: { client: Client }) {
 }
 
 export function ClientList() {
-  const { clients, lock } = useApp();
+  const { clients, lock, password, reloadClients } = useApp();
   const { upcomingEvents, isCalendarConnected } = useCalendar();
   const [search, setSearch] = useState('');
   const [showSummary, setShowSummary] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [backupStatus, setBackupStatus] = useState<string | null>(null);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
 
   const scrollToCalendar = () => {
     calendarRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleBackup = async () => {
+    try {
+      await downloadBackup();
+      setBackupStatus('Backup downloaded! Save it to your Dropbox folder for cloud backup.');
+      setTimeout(() => setBackupStatus(null), 5000);
+    } catch (err) {
+      setBackupStatus('Failed to create backup');
+    }
+  };
+
+  const handleRestoreClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleRestoreFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !password) return;
+
+    setRestoreError(null);
+    try {
+      await restoreFromBackup(file, password);
+      await reloadClients();
+      setShowSettings(false);
+      setBackupStatus('Backup restored successfully!');
+      setTimeout(() => setBackupStatus(null), 3000);
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : 'Failed to restore backup');
+    }
+    // Reset file input
+    e.target.value = '';
   };
 
   // Filter out archived clients
@@ -157,6 +194,9 @@ export function ClientList() {
             <Plus size={18} />
             Add Client
           </Link>
+          <button onClick={() => setShowSettings(true)} className={`btn-ghost ${styles.settingsBtn}`} title="Settings">
+            <Settings size={18} />
+          </button>
           <button onClick={lock} className={`btn-ghost ${styles.lockBtn}`} title="Lock">
             <Lock size={18} />
           </button>
@@ -267,6 +307,64 @@ export function ClientList() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Backup status toast */}
+      {backupStatus && (
+        <div className={styles.toast}>
+          {backupStatus}
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className={styles.modalOverlay} onClick={() => setShowSettings(false)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2>Settings</h2>
+              <button onClick={() => setShowSettings(false)} className={styles.modalClose}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className={styles.modalContent}>
+              <div className={styles.settingsSection}>
+                <h3>Backup & Restore</h3>
+                <p className={styles.settingsDescription}>
+                  Your data is encrypted locally. Export a backup file to save to Dropbox
+                  or another cloud folder for safekeeping.
+                </p>
+
+                <div className={styles.backupActions}>
+                  <button onClick={handleBackup} className="btn-accent">
+                    <Download size={18} />
+                    Download Backup
+                  </button>
+                  <button onClick={handleRestoreClick} className="btn-secondary">
+                    <Upload size={18} />
+                    Restore from Backup
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleRestoreFile}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+
+                {restoreError && (
+                  <p className={styles.restoreError}>{restoreError}</p>
+                )}
+
+                <p className={styles.backupNote}>
+                  Backup files are fully encrypted with your password.
+                  Safe to store in Dropbox, Google Drive, etc.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
