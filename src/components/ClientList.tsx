@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Users, Lock, Mail, Calendar, AlertCircle } from 'lucide-react';
+import { Plus, Search, Users, Lock, Mail, Calendar, DollarSign, Clock } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { AllianceIndicator } from './AllianceIndicator';
 import { EnneagramIndicator } from './EnneagramIndicator';
@@ -9,6 +9,7 @@ import styles from './ClientList.module.css';
 export function ClientList() {
   const { clients, lock } = useApp();
   const [search, setSearch] = useState('');
+  const [showSummary, setShowSummary] = useState(true);
 
   const filteredClients = useMemo(() => {
     if (!search.trim()) return clients;
@@ -23,6 +24,16 @@ export function ClientList() {
   const sortedClients = useMemo(() => {
     return [...filteredClients].sort((a, b) => a.name.localeCompare(b.name));
   }, [filteredClients]);
+
+  const unpaidSummary = useMemo(() => {
+    const clientsWithUnpaid = clients.filter(c => (c.unpaidHours ?? 0) > 0);
+    const totalHours = clientsWithUnpaid.reduce((sum, c) => sum + (c.unpaidHours ?? 0), 0);
+    const totalAmount = clientsWithUnpaid.reduce(
+      (sum, c) => sum + (c.unpaidHours ?? 0) * (c.hourlyRate ?? 0),
+      0
+    );
+    return { clientsWithUnpaid, totalHours, totalAmount };
+  }, [clients]);
 
   return (
     <div className={styles.container}>
@@ -41,6 +52,54 @@ export function ClientList() {
           </button>
         </div>
       </header>
+
+      {/* Unpaid Summary */}
+      {unpaidSummary.totalHours > 0 && (
+        <div className={styles.summaryCard}>
+          <button
+            type="button"
+            className={styles.summaryHeader}
+            onClick={() => setShowSummary(!showSummary)}
+          >
+            <div className={styles.summaryTitle}>
+              <DollarSign size={18} />
+              <span>Unpaid Summary</span>
+            </div>
+            <div className={styles.summaryTotal}>
+              ${unpaidSummary.totalAmount.toFixed(2)}
+            </div>
+          </button>
+          {showSummary && (
+            <div className={styles.summaryContent}>
+              <div className={styles.summaryStats}>
+                <div className={styles.stat}>
+                  <span className={styles.statLabel}>Total Hours</span>
+                  <span className={styles.statValue}>{unpaidSummary.totalHours}</span>
+                </div>
+                <div className={styles.stat}>
+                  <span className={styles.statLabel}>Clients</span>
+                  <span className={styles.statValue}>{unpaidSummary.clientsWithUnpaid.length}</span>
+                </div>
+              </div>
+              <div className={styles.summaryList}>
+                {unpaidSummary.clientsWithUnpaid.map(client => (
+                  <Link
+                    key={client.id}
+                    to={`/client/${client.id}`}
+                    className={styles.summaryItem}
+                  >
+                    <span className={styles.summaryName}>{client.name}</span>
+                    <span className={styles.summaryHours}>{client.unpaidHours}h</span>
+                    <span className={styles.summaryAmount}>
+                      ${((client.unpaidHours ?? 0) * (client.hourlyRate ?? 0)).toFixed(2)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className={styles.searchWrapper}>
         <Search className={styles.searchIcon} size={18} />
@@ -81,18 +140,23 @@ export function ClientList() {
                 <div className={styles.clientInfo}>
                   <h3 className={styles.clientName}>{client.name}</h3>
                   <div className={styles.clientMeta}>
-                    <span className={styles.metaItem}>
-                      <Mail size={14} />
-                      {client.email}
-                    </span>
+                    {client.email && (
+                      <span className={styles.metaItem}>
+                        <Mail size={14} />
+                        {client.email}
+                      </span>
+                    )}
                     <span className={styles.metaItem}>
                       <Calendar size={14} />
                       {client.sessionsCompleted} sessions
                     </span>
-                    {client.unpaidSessions > 0 && (
+                    {(client.unpaidHours ?? 0) > 0 && (
                       <span className={`${styles.metaItem} ${styles.unpaid}`}>
-                        <AlertCircle size={14} />
-                        {client.unpaidSessions} unpaid
+                        <Clock size={14} />
+                        {client.unpaidHours}h unpaid
+                        {(client.hourlyRate ?? 0) > 0 && (
+                          <> (${((client.unpaidHours ?? 0) * (client.hourlyRate ?? 0)).toFixed(0)})</>
+                        )}
                       </span>
                     )}
                   </div>

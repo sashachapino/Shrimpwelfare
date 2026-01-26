@@ -105,6 +105,15 @@
   border-radius: var(--radius-md);
 }
 
+.amountOwed {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--color-accent);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-accent-subtle);
+  border-radius: var(--radius-md);
+}
+
 .addSessionBtn {
   display: flex;
   align-items: center;

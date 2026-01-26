@@ -49,6 +49,113 @@
   border-radius: var(--radius-md);
 }
 
+/* Unpaid Summary Card */
+.summaryCard {
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-lg);
+  overflow: hidden;
+}
+
+.summaryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-md) var(--space-lg);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.summaryHeader:hover {
+  background: rgba(217, 119, 6, 0.1);
+}
+
+.summaryTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.summaryTotal {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.summaryContent {
+  padding: 0 var(--space-lg) var(--space-lg);
+}
+
+.summaryStats {
+  display: flex;
+  gap: var(--space-xl);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid rgba(217, 119, 6, 0.2);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statLabel {
+  font-size: var(--text-xs);
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statValue {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.summaryList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.summaryItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg-card);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  transition: background var(--transition-fast);
+}
+
+.summaryItem:hover {
+  background: var(--color-bg-secondary);
+}
+
+.summaryName {
+  flex: 1;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+
+.summaryHours {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.summaryAmount {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
 .searchWrapper {
   position: relative;
   margin-bottom: var(--space-lg);

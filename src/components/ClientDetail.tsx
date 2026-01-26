@@ -25,7 +25,8 @@ const emptyClient: Omit<Client, 'id' | 'createdAt' | 'updatedAt'> = {
   enneagramType: '?',
   enneagramWing: null,
   sessionsCompleted: 0,
-  unpaidSessions: 0,
+  unpaidHours: 0,
+  hourlyRate: 0,
   sessionNotes: [],
   overallNotes: '',
   currentQuestions: '',
@@ -193,20 +194,48 @@ export function ClientDetail() {
             </div>
 
             <div className={styles.field}>
-              <label htmlFor="unpaidSessions">Unpaid Sessions</label>
+              <label htmlFor="unpaidHours">Unpaid Hours</label>
               <input
-                id="unpaidSessions"
+                id="unpaidHours"
                 type="number"
                 min="0"
-                value={formData.unpaidSessions}
+                step="0.5"
+                value={formData.unpaidHours}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    unpaidSessions: parseInt(e.target.value) || 0,
+                    unpaidHours: parseFloat(e.target.value) || 0,
                   }))
                 }
               />
             </div>
+          </div>
+
+          <div className={styles.grid}>
+            <div className={styles.field}>
+              <label htmlFor="hourlyRate">Hourly Rate ($)</label>
+              <input
+                id="hourlyRate"
+                type="number"
+                min="0"
+                step="1"
+                value={formData.hourlyRate}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    hourlyRate: parseFloat(e.target.value) || 0,
+                  }))
+                }
+              />
+            </div>
+            {formData.unpaidHours > 0 && formData.hourlyRate > 0 && (
+              <div className={styles.field}>
+                <label>Amount Owed</label>
+                <div className={styles.amountOwed}>
+                  ${(formData.unpaidHours * formData.hourlyRate).toFixed(2)}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className={styles.field}>

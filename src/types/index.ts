@@ -19,7 +19,8 @@ export interface Client {
   enneagramType: EnneagramType;
   enneagramWing: EnneagramWing;
   sessionsCompleted: number;
-  unpaidSessions: number;
+  unpaidHours: number; // supports decimals (e.g., 1.5 for 1.5 hours)
+  hourlyRate: number; // dollar rate per hour
   sessionNotes: SessionNote[];
   overallNotes: string;
   currentQuestions: string;
