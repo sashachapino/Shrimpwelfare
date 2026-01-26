@@ -124,6 +124,36 @@
   padding: var(--space-md);
 }
 
+.addSessionForm {
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.addSessionFields {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.addSessionFields input {
+  font-size: var(--text-sm);
+}
+
+.addSessionActions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.addSessionActions button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
 .actions {
   display: flex;
   align-items: center;

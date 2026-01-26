@@ -51,6 +51,9 @@ export function ClientDetail() {
     notes: true,
     questions: true,
   });
+  const [showAddSession, setShowAddSession] = useState(false);
+  const [newSessionNumber, setNewSessionNumber] = useState(1);
+  const [newSessionDate, setNewSessionDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     if (existingClient) {
@@ -99,8 +102,8 @@ export function ClientDetail() {
   const handleAddSession = () => {
     const newSession: SessionNote = {
       id: crypto.randomUUID(),
-      sessionNumber: formData.sessionsCompleted + 1,
-      date: new Date().toISOString().split('T')[0],
+      sessionNumber: newSessionNumber,
+      date: newSessionDate,
       notes: '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -108,9 +111,13 @@ export function ClientDetail() {
 
     setFormData((prev) => ({
       ...prev,
-      sessionsCompleted: prev.sessionsCompleted + 1,
+      sessionsCompleted: Math.max(prev.sessionsCompleted, newSessionNumber),
       sessionNotes: [...prev.sessionNotes, newSession],
     }));
+    setShowAddSession(false);
+    // Reset for next time, suggest next session number
+    setNewSessionNumber(Math.max(formData.sessionsCompleted, newSessionNumber) + 1);
+    setNewSessionDate(new Date().toISOString().split('T')[0]);
   };
 
   const handleUpdateSessionNote = (sessionId: string, updates: Partial<SessionNote>) => {
@@ -200,11 +207,11 @@ export function ClientDetail() {
                 type="number"
                 min="0"
                 step="0.5"
-                value={formData.unpaidHours}
+                value={formData.unpaidHours || ''}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    unpaidHours: parseFloat(e.target.value) || 0,
+                    unpaidHours: e.target.value === '' ? 0 : parseFloat(e.target.value),
                   }))
                 }
               />
@@ -219,11 +226,11 @@ export function ClientDetail() {
                 type="number"
                 min="0"
                 step="1"
-                value={formData.hourlyRate}
+                value={formData.hourlyRate || ''}
                 onChange={(e) =>
                   setFormData((prev) => ({
                     ...prev,
-                    hourlyRate: parseFloat(e.target.value) || 0,
+                    hourlyRate: e.target.value === '' ? 0 : parseFloat(e.target.value),
                   }))
                 }
               />
@@ -285,14 +292,60 @@ export function ClientDetail() {
                 onUpdate={handleUpdateSessionNote}
                 onDelete={handleDeleteSession}
               />
-              <button
-                type="button"
-                className={`btn-secondary ${styles.addSessionBtn}`}
-                onClick={handleAddSession}
-              >
-                <Plus size={18} />
-                Add Session
-              </button>
+              {showAddSession ? (
+                <div className={styles.addSessionForm}>
+                  <div className={styles.addSessionFields}>
+                    <div className={styles.field}>
+                      <label htmlFor="newSessionNumber">Session #</label>
+                      <input
+                        id="newSessionNumber"
+                        type="number"
+                        min="1"
+                        value={newSessionNumber}
+                        onChange={(e) => setNewSessionNumber(parseInt(e.target.value) || 1)}
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label htmlFor="newSessionDate">Date</label>
+                      <input
+                        id="newSessionDate"
+                        type="date"
+                        value={newSessionDate}
+                        onChange={(e) => setNewSessionDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className={styles.addSessionActions}>
+                    <button
+                      type="button"
+                      className="btn-accent"
+                      onClick={handleAddSession}
+                    >
+                      <Plus size={18} />
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      onClick={() => setShowAddSession(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={`btn-secondary ${styles.addSessionBtn}`}
+                  onClick={() => {
+                    setNewSessionNumber(formData.sessionsCompleted + 1);
+                    setShowAddSession(true);
+                  }}
+                >
+                  <Plus size={18} />
+                  Add Session
+                </button>
+              )}
             </div>
           )}
         </section>
