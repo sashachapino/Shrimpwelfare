@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Lock, Eye, EyeOff, Shield } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import { ShrimpIcon } from './ShrimpIcon';
 import styles from './LockScreen.module.css';
 
 export function LockScreen() {
@@ -33,7 +34,7 @@ export function LockScreen() {
     <div className={styles.container}>
       <div className={styles.card}>
         <div className={styles.iconWrapper}>
-          <Shield className={styles.icon} />
+          <ShrimpIcon size={64} className={styles.icon} />
         </div>
 
         <h1 className={styles.title}>Coaching CRM</h1>

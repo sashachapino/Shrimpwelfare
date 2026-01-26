@@ -7,7 +7,8 @@ import { AllianceIndicator } from './AllianceIndicator';
 import { EnneagramIndicator } from './EnneagramIndicator';
 import { UpcomingCalls } from './UpcomingCalls';
 import { PostCallNotifications } from './PostCallNotifications';
-import { downloadBackup, restoreFromBackup } from '../utils/storage';
+import { downloadBackup, restoreFromBackup, isElectron, getDropboxBackupPath, listDropboxBackups, restoreFromDropboxBackup } from '../utils/storage';
+import { ShrimpIcon } from './ShrimpIcon';
 import type { Client } from '../types';
 import styles from './ClientList.module.css';
 
@@ -156,6 +157,7 @@ export function ClientList() {
     <div className={styles.container}>
       <header className={styles.header}>
         <div className={styles.titleSection}>
+          <ShrimpIcon size={36} className={styles.shrimpIcon} />
           <h1>Clients</h1>
           <span className={styles.count}>{nonArchivedClients.length}</span>
           {unpaidSummary.totalAmount > 0 && (
