@@ -1,7 +1,8 @@
 import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Users, Lock, Mail, Calendar, DollarSign, Clock, ChevronDown, Archive } from 'lucide-react';
+import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import { useCalendar } from '../contexts/CalendarContext';
 import { AllianceIndicator } from './AllianceIndicator';
 import { EnneagramIndicator } from './EnneagramIndicator';
 import { UpcomingCalls } from './UpcomingCalls';
@@ -26,7 +27,7 @@ function ClientCard({ client }: { client: Client }) {
               </span>
             )}
             <span className={styles.metaItem}>
-              <Calendar size={14} />
+              <CalendarIcon size={14} />
               {client.sessionsCompleted} sessions
             </span>
             {(client.unpaidHours ?? 0) > 0 && (
@@ -61,9 +62,15 @@ function ClientCard({ client }: { client: Client }) {
 
 export function ClientList() {
   const { clients, lock } = useApp();
+  const { upcomingEvents, isCalendarConnected } = useCalendar();
   const [search, setSearch] = useState('');
   const [showSummary, setShowSummary] = useState(true);
   const summaryRef = useRef<HTMLDivElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
+
+  const scrollToCalendar = () => {
+    calendarRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   // Filter out archived clients
   const nonArchivedClients = useMemo(() => {
@@ -126,6 +133,18 @@ export function ClientList() {
               <ChevronDown size={14} />
             </button>
           )}
+          {isCalendarConnected && upcomingEvents.length > 0 && (
+            <button
+              type="button"
+              className={styles.calendarBadge}
+              onClick={scrollToCalendar}
+              title="View upcoming calls"
+            >
+              <CalendarIcon size={14} />
+              {upcomingEvents.length}
+              <ChevronDown size={14} />
+            </button>
+          )}
         </div>
         <div className={styles.actions}>
           {archivedCount > 0 && (
@@ -156,7 +175,6 @@ export function ClientList() {
       </div>
 
       <PostCallNotifications />
-      <UpcomingCalls />
 
       {nonArchivedClients.length === 0 ? (
         <div className={styles.empty}>
@@ -198,6 +216,11 @@ export function ClientList() {
           )}
         </>
       )}
+
+      {/* Upcoming Calls - at bottom, collapsible */}
+      <div ref={calendarRef}>
+        <UpcomingCalls collapsible />
+      </div>
 
       {/* Unpaid Summary - at bottom */}
       {unpaidSummary.totalHours > 0 && (

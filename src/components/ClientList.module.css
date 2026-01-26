@@ -52,6 +52,27 @@
   color: var(--color-accent);
 }
 
+.calendarBadge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.calendarBadge:hover {
+  background: #dbeafe;
+  border-color: #3b82f6;
+  color: #2563eb;
+}
+
 .actions {
   display: flex;
   align-items: center;
