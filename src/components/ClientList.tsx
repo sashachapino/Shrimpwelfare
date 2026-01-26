@@ -4,6 +4,8 @@ import { Plus, Search, Users, Lock, Mail, Calendar, DollarSign, Clock, ChevronDo
 import { useApp } from '../contexts/AppContext';
 import { AllianceIndicator } from './AllianceIndicator';
 import { EnneagramIndicator } from './EnneagramIndicator';
+import { UpcomingCalls } from './UpcomingCalls';
+import { PostCallNotifications } from './PostCallNotifications';
 import type { Client } from '../types';
 import styles from './ClientList.module.css';
 
@@ -152,6 +154,9 @@ export function ClientList() {
           className={styles.searchInput}
         />
       </div>
+
+      <PostCallNotifications />
+      <UpcomingCalls />
 
       {nonArchivedClients.length === 0 ? (
         <div className={styles.empty}>

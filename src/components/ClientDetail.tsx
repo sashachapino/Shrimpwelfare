@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   ArrowLeft,
   Save,
@@ -37,7 +37,9 @@ const emptyClient: Omit<Client, 'id' | 'createdAt' | 'updatedAt'> = {
 export function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { getClient, addClient, updateClient, deleteClient } = useApp();
+  const unpaidHoursRef = useRef<HTMLInputElement>(null);
 
   const isNew = id === 'new';
   const existingClient = id && !isNew ? getClient(id) : null;
@@ -61,6 +63,24 @@ export function ClientDetail() {
       setFormData(existingClient);
     }
   }, [existingClient]);
+
+  // Handle action query params from post-call notifications
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (!action || !existingClient) return;
+
+    if (action === 'addSession') {
+      setNewSessionNumber(existingClient.sessionsCompleted + 1);
+      setShowAddSession(true);
+      setExpandedSections((prev) => ({ ...prev, sessions: true }));
+    } else if (action === 'addHours') {
+      // Focus on unpaid hours field after a small delay
+      setTimeout(() => {
+        unpaidHoursRef.current?.focus();
+        unpaidHoursRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }, [searchParams, existingClient]);
 
   if (!isNew && !existingClient) {
     return (
@@ -204,6 +224,7 @@ export function ClientDetail() {
             <div className={styles.field}>
               <label htmlFor="unpaidHours">Unpaid Hours</label>
               <input
+                ref={unpaidHoursRef}
                 id="unpaidHours"
                 type="number"
                 min="0"

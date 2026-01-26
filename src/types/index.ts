@@ -42,3 +42,24 @@ export interface AppState {
   isUnlocked: boolean;
   hasExistingData: boolean;
 }
+
+// Calendar integration types
+export interface CalendarEvent {
+  id: string;
+  summary: string;
+  description?: string;
+  start: Date;
+  end: Date;
+  attendees: string[];
+  htmlLink: string;
+}
+
+export interface PostCallNotification {
+  id: string;
+  eventId: string;
+  clientId: string;
+  clientName: string;
+  eventSummary: string;
+  eventEnd: Date;
+  dismissed: boolean;
+}

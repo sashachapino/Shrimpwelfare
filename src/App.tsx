@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './contexts/AppContext';
+import { CalendarProvider } from './contexts/CalendarContext';
 import { LockScreen } from './components/LockScreen';
 import { ClientList } from './components/ClientList';
 import { ClientDetail } from './components/ClientDetail';
@@ -34,7 +35,9 @@ function App() {
   return (
     <BrowserRouter>
       <AppProvider>
-        <AppRoutes />
+        <CalendarProvider>
+          <AppRoutes />
+        </CalendarProvider>
       </AppProvider>
     </BrowserRouter>
   );

@@ -32,7 +32,7 @@ export function ArchivedClients() {
   const handleRestore = (client: Client, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    updateClient({ ...client, status: 'active' });
+    updateClient(client.id, { status: 'active' });
   };
 
   return (
