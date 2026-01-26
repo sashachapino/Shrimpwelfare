@@ -21,6 +21,26 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | null>(null);
 
+// Migrate old client data to include new fields
+function migrateClient(client: Partial<Client>): Client {
+  return {
+    id: client.id ?? crypto.randomUUID(),
+    name: client.name ?? '',
+    email: client.email ?? '',
+    enneagramType: client.enneagramType ?? '?',
+    enneagramWing: client.enneagramWing ?? null,
+    sessionsCompleted: client.sessionsCompleted ?? 0,
+    unpaidHours: client.unpaidHours ?? (client as { unpaidSessions?: number }).unpaidSessions ?? 0,
+    hourlyRate: client.hourlyRate ?? 0,
+    sessionNotes: client.sessionNotes ?? [],
+    overallNotes: client.overallNotes ?? '',
+    currentQuestions: client.currentQuestions ?? '',
+    allianceStrength: client.allianceStrength ?? 5,
+    createdAt: client.createdAt ?? new Date().toISOString(),
+    updatedAt: client.updatedAt ?? new Date().toISOString(),
+  };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [hasData, setHasData] = useState(false);
@@ -54,9 +74,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return false;
       }
       const data = await loadClients(pwd);
-      setClients(data);
+      // Migrate old client data to include new fields
+      const migratedData = data.map(migrateClient);
+      setClients(migratedData);
       setPassword(pwd);
       setIsUnlocked(true);
+      // Save migrated data back to storage
+      if (JSON.stringify(data) !== JSON.stringify(migratedData)) {
+        await saveClients(migratedData, pwd);
+      }
       return true;
     } catch (err) {
       setError('Failed to unlock. Please try again.');
