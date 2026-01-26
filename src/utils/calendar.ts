@@ -1,4 +1,4 @@
-const CLIENT_ID = '372873176218-f7b0tbtpk5r68uj9nos5j8lg3vstkqr7.apps.googleusercontent.com';
+const CLIENT_ID = '977606447321-mt672r86crrrhfi27uh7cut96mraoo9v.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
 const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
 
