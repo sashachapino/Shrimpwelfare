@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { Client } from '../types';
-import { hasExistingData, initializeWithPassword, verifyPassword, loadClients, saveClients } from '../utils/storage';
+import { hasExistingData, initializeWithPassword, verifyPassword, loadClients, saveClients, loadSettings, saveSettings } from '../utils/storage';
 
 interface AppContextType {
   isUnlocked: boolean;
@@ -9,6 +9,7 @@ interface AppContextType {
   password: string | null;
   loading: boolean;
   error: string | null;
+  anthropicApiKey: string | null;
   unlock: (password: string) => Promise<boolean>;
   initialize: (password: string) => Promise<void>;
   lock: () => void;
@@ -16,6 +17,7 @@ interface AppContextType {
   updateClient: (id: string, updates: Partial<Client>) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
   getClient: (id: string) => Client | undefined;
+  setAnthropicApiKey: (key: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -49,6 +51,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [password, setPassword] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [anthropicApiKey, setAnthropicApiKeyState] = useState<string | null>(null);
 
   useEffect(() => {
     checkExistingData();
@@ -84,6 +87,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (JSON.stringify(data) !== JSON.stringify(migratedData)) {
         await saveClients(migratedData, pwd);
       }
+      // Load settings including API key
+      const settings = await loadSettings(pwd);
+      setAnthropicApiKeyState(settings.anthropicApiKey || null);
       return true;
     } catch (err) {
       setError('Failed to unlock. Please try again.');
@@ -113,7 +119,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIsUnlocked(false);
     setPassword(null);
     setClients([]);
+    setAnthropicApiKeyState(null);
   }, []);
+
+  const setAnthropicApiKey = useCallback(async (key: string) => {
+    if (!password) return;
+    setAnthropicApiKeyState(key);
+    const settings = await loadSettings(password);
+    await saveSettings({ ...settings, anthropicApiKey: key }, password);
+  }, [password]);
 
   const addClient = useCallback(async (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!password) return;
@@ -168,6 +182,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         password,
         loading,
         error,
+        anthropicApiKey,
         unlock,
         initialize,
         lock,
@@ -175,6 +190,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         updateClient,
         deleteClient,
         getClient,
+        setAnthropicApiKey,
         clearError,
       }}
     >

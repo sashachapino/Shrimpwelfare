@@ -7,6 +7,11 @@ const DB_VERSION = 1;
 const STORE_NAME = 'encrypted-data';
 const PASSWORD_HASH_KEY = 'password-hash';
 const DATA_KEY = 'clients-data';
+const SETTINGS_KEY = 'settings-data';
+
+export interface AppSettings {
+  anthropicApiKey?: string;
+}
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -117,4 +122,34 @@ export async function clearAllData(): Promise<void> {
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve();
   });
+}
+
+export async function loadSettings(password: string): Promise<AppSettings> {
+  const encrypted = await getValue<EncryptedStore>(SETTINGS_KEY);
+  if (!encrypted) return {};
+
+  try {
+    const decrypted = await decrypt(
+      encrypted.data,
+      password,
+      encrypted.iv,
+      encrypted.salt
+    );
+    return JSON.parse(decrypted) as AppSettings;
+  } catch {
+    return {};
+  }
+}
+
+export async function saveSettings(settings: AppSettings, password: string): Promise<void> {
+  const data = JSON.stringify(settings);
+  const { iv, salt, ciphertext } = await encrypt(data, password);
+
+  const encrypted: EncryptedStore = {
+    iv,
+    salt,
+    data: ciphertext,
+  };
+
+  await setValue(SETTINGS_KEY, encrypted);
 }

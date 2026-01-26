@@ -198,6 +198,10 @@
   color: var(--color-text-secondary);
 }
 
+.insightsSection {
+  margin-top: var(--space-md);
+}
+
 .actions {
   display: flex;
   align-items: center;

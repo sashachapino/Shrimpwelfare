@@ -16,6 +16,7 @@ import { useApp } from '../contexts/AppContext';
 import { AllianceIndicator } from './AllianceIndicator';
 import { EnneagramIndicator } from './EnneagramIndicator';
 import { SessionNotes } from './SessionNotes';
+import { CoachingInsights } from './CoachingInsights';
 import type { Client, SessionNote, EnneagramType, EnneagramWing, ClientStatus } from '../types';
 import styles from './ClientDetail.module.css';
 
@@ -441,6 +442,13 @@ export function ClientDetail() {
             </div>
           )}
         </section>
+
+        {/* AI Coaching Insights */}
+        {!isNew && existingClient && (
+          <section className={styles.insightsSection}>
+            <CoachingInsights client={existingClient} />
+          </section>
+        )}
 
         {/* Actions */}
         <div className={styles.actions}>
