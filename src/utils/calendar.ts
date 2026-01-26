@@ -157,6 +157,13 @@ export async function getUpcomingEvents(
     const events = response.result.items || [];
     const clientEmailSet = new Set(clientEmails.map(e => e.toLowerCase()));
 
+    // Debug logging
+    console.log('Calendar: Found', events.length, 'total events');
+    console.log('Calendar: Looking for client emails:', [...clientEmailSet]);
+    events.forEach((e: gapi.client.calendar.Event) => {
+      console.log('Calendar event:', e.summary, '| Attendees:', e.attendees?.map(a => a.email) || 'none');
+    });
+
     // Filter events that have attendees matching client emails
     return events
       .filter((event: gapi.client.calendar.Event) => {
