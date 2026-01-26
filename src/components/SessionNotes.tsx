@@ -47,10 +47,8 @@ export function SessionNotes({ sessions, onUpdate, onDelete }: SessionNotesProps
     );
   }
 
-  // Sort sessions by date (most recent first)
-  const sortedSessions = [...sessions].sort((a, b) =>
-    new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  // Sort sessions by session number (highest first)
+  const sortedSessions = [...sessions].sort((a, b) => b.sessionNumber - a.sessionNumber);
 
   return (
     <div className={styles.list}>
