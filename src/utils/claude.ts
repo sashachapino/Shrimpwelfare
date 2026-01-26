@@ -95,8 +95,24 @@ export async function getCoachingInsights(
   }
 
   try {
-    // Parse the JSON response
-    const insight = JSON.parse(content);
+    // Parse the JSON response - handle potential markdown code blocks
+    let jsonContent = content.trim();
+
+    // Remove markdown code blocks if present
+    const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonContent = jsonMatch[1].trim();
+    }
+
+    // Also try to extract JSON object if there's surrounding text
+    if (!jsonContent.startsWith('{')) {
+      const objectMatch = jsonContent.match(/\{[\s\S]*\}/);
+      if (objectMatch) {
+        jsonContent = objectMatch[0];
+      }
+    }
+
+    const insight = JSON.parse(jsonContent);
     return {
       leadingQuestions: insight.leadingQuestions || [],
       blindSpots: insight.blindSpots || [],
