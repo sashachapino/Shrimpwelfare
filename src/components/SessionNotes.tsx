@@ -5,7 +5,7 @@ import styles from './SessionNotes.module.css';
 
 interface SessionNotesProps {
   sessions: SessionNote[];
-  onUpdate: (sessionId: string, notes: string) => void;
+  onUpdate: (sessionId: string, updates: Partial<SessionNote>) => void;
   onDelete: (sessionId: string) => void;
 }
 
@@ -47,8 +47,10 @@ export function SessionNotes({ sessions, onUpdate, onDelete }: SessionNotesProps
     );
   }
 
-  // Sort sessions by session number (most recent first)
-  const sortedSessions = [...sessions].sort((a, b) => b.sessionNumber - a.sessionNumber);
+  // Sort sessions by date (most recent first)
+  const sortedSessions = [...sessions].sort((a, b) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 
   return (
     <div className={styles.list}>
@@ -71,9 +73,18 @@ export function SessionNotes({ sessions, onUpdate, onDelete }: SessionNotesProps
 
           {expandedSessions.has(session.id) && (
             <div className={styles.sessionContent}>
+              <div className={styles.dateField}>
+                <label>Date</label>
+                <input
+                  type="date"
+                  value={session.date}
+                  onChange={(e) => onUpdate(session.id, { date: e.target.value })}
+                  className={styles.dateInput}
+                />
+              </div>
               <textarea
                 value={session.notes}
-                onChange={(e) => onUpdate(session.id, e.target.value)}
+                onChange={(e) => onUpdate(session.id, { notes: e.target.value })}
                 placeholder="Session notes, observations, key moments, homework given..."
                 rows={5}
               />

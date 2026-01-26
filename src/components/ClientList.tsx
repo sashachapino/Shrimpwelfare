@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Plus, Search, Users, Lock, Mail, Calendar, AlertCircle } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { AllianceIndicator } from './AllianceIndicator';
+import { EnneagramIndicator } from './EnneagramIndicator';
 import styles from './ClientList.module.css';
 
 export function ClientList() {
@@ -96,7 +97,14 @@ export function ClientList() {
                     )}
                   </div>
                 </div>
-                <AllianceIndicator value={client.allianceStrength} size="sm" />
+                <div className={styles.indicators}>
+                  <EnneagramIndicator
+                    type={client.enneagramType ?? '?'}
+                    wing={client.enneagramWing ?? null}
+                    size="sm"
+                  />
+                  <AllianceIndicator value={client.allianceStrength} size="sm" />
+                </div>
               </div>
               {client.currentQuestions && (
                 <p className={styles.questions}>

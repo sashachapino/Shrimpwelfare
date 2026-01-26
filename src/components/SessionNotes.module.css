@@ -60,6 +60,22 @@
   animation: slideDown 200ms ease-out;
 }
 
+.dateField {
+  margin-bottom: var(--space-sm);
+}
+
+.dateField label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-xs);
+}
+
+.dateInput {
+  width: auto;
+  font-size: var(--text-sm);
+  padding: var(--space-xs) var(--space-sm);
+}
+
 @keyframes slideDown {
   from {
     opacity: 0;

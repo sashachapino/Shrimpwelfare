@@ -138,6 +138,13 @@
   color: var(--color-warning);
 }
 
+.indicators {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-sm);
+}
+
 .questions {
   margin-top: var(--space-md);
   padding-top: var(--space-md);

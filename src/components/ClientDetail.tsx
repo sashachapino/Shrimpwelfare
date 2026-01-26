@@ -14,13 +14,16 @@ import {
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { AllianceIndicator } from './AllianceIndicator';
+import { EnneagramIndicator } from './EnneagramIndicator';
 import { SessionNotes } from './SessionNotes';
-import type { Client, SessionNote } from '../types';
+import type { Client, SessionNote, EnneagramType, EnneagramWing } from '../types';
 import styles from './ClientDetail.module.css';
 
 const emptyClient: Omit<Client, 'id' | 'createdAt' | 'updatedAt'> = {
   name: '',
   email: '',
+  enneagramType: '?',
+  enneagramWing: null,
   sessionsCompleted: 0,
   unpaidSessions: 0,
   sessionNotes: [],
@@ -109,11 +112,11 @@ export function ClientDetail() {
     }));
   };
 
-  const handleUpdateSessionNote = (sessionId: string, notes: string) => {
+  const handleUpdateSessionNote = (sessionId: string, updates: Partial<SessionNote>) => {
     setFormData((prev) => ({
       ...prev,
       sessionNotes: prev.sessionNotes.map((s) =>
-        s.id === sessionId ? { ...s, notes, updatedAt: new Date().toISOString() } : s
+        s.id === sessionId ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
       ),
     }));
   };
@@ -216,6 +219,18 @@ export function ClientDetail() {
                 onChange={(value) => setFormData((prev) => ({ ...prev, allianceStrength: value }))}
               />
             </div>
+          </div>
+
+          <div className={styles.field}>
+            <label>Enneagram Type</label>
+            <EnneagramIndicator
+              type={formData.enneagramType}
+              wing={formData.enneagramWing}
+              size="lg"
+              onChange={(type: EnneagramType, wing: EnneagramWing) =>
+                setFormData((prev) => ({ ...prev, enneagramType: type, enneagramWing: wing }))
+              }
+            />
           </div>
         </section>
 

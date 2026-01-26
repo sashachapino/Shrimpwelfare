@@ -9,10 +9,15 @@ export interface SessionNote {
   updatedAt: string;
 }
 
+export type EnneagramType = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | '?';
+export type EnneagramWing = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | null;
+
 export interface Client {
   id: string;
   name: string;
   email: string;
+  enneagramType: EnneagramType;
+  enneagramWing: EnneagramWing;
   sessionsCompleted: number;
   unpaidSessions: number;
   sessionNotes: SessionNote[];
