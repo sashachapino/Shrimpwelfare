@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Sparkles, Key, Loader2, AlertCircle, MessageCircle, Eye, TrendingUp, ArrowRight } from 'lucide-react';
+import { Sparkles, Key, Loader2, AlertCircle, Shield, Eye, ChevronDown, ChevronUp } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { getCoachingInsights, type CoachingInsight } from '../utils/claude';
+import { getCoachingInsights, getAnonymizationPreview, type CoachingInsight, type AnonymizationPreview } from '../utils/claude';
 import type { Client } from '../types';
 import styles from './CoachingInsights.module.css';
 
@@ -16,6 +16,8 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
   const [error, setError] = useState<string | null>(null);
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [apiKeyInput, setApiKeyInput] = useState('');
+  const [preview, setPreview] = useState<AnonymizationPreview | null>(null);
+  const [showFullPreview, setShowFullPreview] = useState(false);
 
   const handleSaveApiKey = async () => {
     if (apiKeyInput.trim()) {
@@ -25,23 +27,34 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
     }
   };
 
-  const handleGetInsights = async () => {
+  const handleShowPreview = () => {
     if (!anthropicApiKey) {
       setShowApiKeyInput(true);
       return;
     }
+    const previewData = getAnonymizationPreview(client);
+    setPreview(previewData);
+  };
+
+  const handleConfirmSend = async () => {
+    if (!anthropicApiKey || !preview) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const result = await getCoachingInsights(anthropicApiKey, client);
+      const result = await getCoachingInsights(anthropicApiKey, preview.anonymizedData);
       setInsights(result);
+      setPreview(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get insights');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCancel = () => {
+    setPreview(null);
   };
 
   if (showApiKeyInput) {
@@ -50,7 +63,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
         <div className={styles.apiKeyPrompt}>
           <Key className={styles.keyIcon} />
           <h3>Connect Claude</h3>
-          <p>Enter your Anthropic API key to enable AI-powered coaching insights</p>
+          <p>Enter your Anthropic API key to enable AI-powered coaching questions</p>
           <input
             type="password"
             value={apiKeyInput}
@@ -74,12 +87,67 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
     );
   }
 
+  if (preview) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.previewSection}>
+          <div className={styles.previewHeader}>
+            <Shield size={20} />
+            <h3>Review Anonymized Data</h3>
+          </div>
+
+          <p className={styles.previewWarning}>
+            The following anonymized data will be sent to Anthropic's servers.
+            Please review and confirm no identifying information remains.
+          </p>
+
+          {preview.anonymizedData.allReplacements.length > 0 && (
+            <div className={styles.replacementsList}>
+              <h4>Automatic replacements made:</h4>
+              <ul>
+                {preview.anonymizedData.allReplacements.map((r, i) => (
+                  <li key={i}>{r}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className={styles.previewToggle}>
+            <button
+              onClick={() => setShowFullPreview(!showFullPreview)}
+              className={styles.toggleBtn}
+            >
+              <Eye size={16} />
+              {showFullPreview ? 'Hide' : 'Show'} full prompt
+              {showFullPreview ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+          </div>
+
+          {showFullPreview && (
+            <div className={styles.fullPreview}>
+              <pre>{preview.promptPreview}</pre>
+            </div>
+          )}
+
+          <div className={styles.previewActions}>
+            <button onClick={handleConfirmSend} className="btn-accent">
+              Confirm & Send
+            </button>
+            <button onClick={handleCancel} className="btn-ghost">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className={styles.container}>
         <div className={styles.loading}>
           <Loader2 className={styles.spinner} />
-          <p>Diana is reviewing the notes...</p>
+          <p>Generating coaching questions...</p>
         </div>
       </div>
     );
@@ -91,7 +159,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
         <div className={styles.error}>
           <AlertCircle size={20} />
           <p>{error}</p>
-          <button onClick={handleGetInsights} className="btn-secondary">
+          <button onClick={handleShowPreview} className="btn-secondary">
             Try Again
           </button>
         </div>
@@ -105,57 +173,45 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
         <div className={styles.header}>
           <h2>
             <Sparkles size={20} />
-            Diana's Perspective
+            Coaching Questions
           </h2>
-          <button onClick={handleGetInsights} className={styles.refreshBtn}>
+          <button onClick={handleShowPreview} className={styles.refreshBtn}>
             Refresh
           </button>
         </div>
 
         <div className={styles.insightSection}>
-          <h3>
-            <MessageCircle size={16} />
-            Leading Questions
+          <h3 className={styles.perspectiveTitle}>
+            Diana Chapman
+            <span className={styles.perspectiveSubtitle}>Conscious Leadership</span>
           </h3>
           <ul>
-            {insights.leadingQuestions.map((q, i) => (
+            {insights.dianaChapman.map((q, i) => (
               <li key={i}>{q}</li>
             ))}
           </ul>
         </div>
 
         <div className={styles.insightSection}>
-          <h3>
-            <Eye size={16} />
-            Blind Spots
+          <h3 className={styles.perspectiveTitle}>
+            Bruce Tift
+            <span className={styles.perspectiveSubtitle}>Developmental/Relational</span>
           </h3>
           <ul>
-            {insights.blindSpots.map((b, i) => (
-              <li key={i}>{b}</li>
+            {insights.bruceTift.map((q, i) => (
+              <li key={i}>{q}</li>
             ))}
           </ul>
         </div>
 
         <div className={styles.insightSection}>
-          <h3>
-            <TrendingUp size={16} />
-            Patterns
+          <h3 className={styles.perspectiveTitle}>
+            Fritz Perls
+            <span className={styles.perspectiveSubtitle}>Gestalt</span>
           </h3>
           <ul>
-            {insights.patterns.map((p, i) => (
-              <li key={i}>{p}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className={styles.insightSection}>
-          <h3>
-            <ArrowRight size={16} />
-            Next Steps
-          </h3>
-          <ul>
-            {insights.nextSteps.map((s, i) => (
-              <li key={i}>{s}</li>
+            {insights.fritzPerls.map((q, i) => (
+              <li key={i}>{q}</li>
             ))}
           </ul>
         </div>
@@ -165,12 +221,13 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
 
   return (
     <div className={styles.container}>
-      <button onClick={handleGetInsights} className={styles.getInsightsBtn}>
+      <button onClick={handleShowPreview} className={styles.getInsightsBtn}>
         <Sparkles size={18} />
-        Get Diana's Perspective
+        Get Coaching Questions
       </button>
       <p className={styles.description}>
-        AI-powered coaching insights inspired by Diana Chapman's approach
+        AI-generated questions from Diana Chapman, Bruce Tift, and Fritz Perls perspectives.
+        Data is anonymized before sending.
       </p>
     </div>
   );

@@ -1,66 +1,99 @@
 import type { Client } from '../types';
+import { anonymizeClientData, type AnonymizedClientData } from './anonymize';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
 export interface CoachingInsight {
-  leadingQuestions: string[];
-  blindSpots: string[];
-  patterns: string[];
-  nextSteps: string[];
+  dianaChapman: string[];
+  bruceTift: string[];
+  fritzPerls: string[];
 }
 
-function buildPrompt(client: Client): string {
-  const sessionNotesText = client.sessionNotes
+export interface AnonymizationPreview {
+  anonymizedData: AnonymizedClientData;
+  promptPreview: string;
+}
+
+function buildPrompt(data: AnonymizedClientData): string {
+  const sessionNotesText = data.sessionNotes
     .sort((a, b) => a.sessionNumber - b.sessionNumber)
-    .map(s => `Session ${s.sessionNumber} (${s.date}):\n${s.notes || '(no notes)'}`)
+    .map(s => `Session ${s.sessionNumber}:\n${s.notes || '(no notes)'}`)
     .join('\n\n');
 
-  const enneagramInfo = client.enneagramType !== '?'
-    ? `Enneagram: Type ${client.enneagramType}${client.enneagramWing ? `w${client.enneagramWing}` : ''}`
+  const enneagramInfo = data.enneagramType !== '?'
+    ? `Enneagram: Type ${data.enneagramType}${data.enneagramWing ? `w${data.enneagramWing}` : ''}`
     : '';
 
-  return `You are channeling the perspective of Diana Chapman, co-author of "The 15 Commitments of Conscious Leadership" and master coach. You bring her distinctive approach: radical candor, body-based awareness, distinguishing fact from story, the drama triangle (victim/villain/hero), and the concept of being "above the line" (open, curious, committed to learning) vs "below the line" (closed, defensive, committed to being right).
+  return `You are helping a coach by generating powerful questions from three distinct therapeutic perspectives. Review the anonymized client notes below and generate questions the coach could ask.
 
-Review this coaching client's information and provide insights to help the coach (not the client directly).
+IMPORTANT: Do not make assumptions about what is happening or analyze patterns. The notes may be incomplete or ambiguous. Simply generate questions that each practitioner would characteristically ask based on their approach.
 
-CLIENT: ${client.name}
-${enneagramInfo}
-Sessions completed: ${client.sessionsCompleted}
-Alliance strength: ${client.allianceStrength}/10
+${enneagramInfo ? enneagramInfo + '\n' : ''}Sessions completed: ${data.sessionsCompleted}
+Alliance strength: ${data.allianceStrength}/10
 
 OVERALL NOTES:
-${client.overallNotes || '(none)'}
+${data.overallNotes || '(none)'}
 
 CURRENT QUESTIONS THE COACH IS HOLDING:
-${client.currentQuestions || '(none)'}
+${data.currentQuestions || '(none)'}
 
 SESSION NOTES:
 ${sessionNotesText || '(no session notes yet)'}
 
 ---
 
-As Diana Chapman would, provide your insights in this exact JSON format:
+Generate questions from these three perspectives:
+
+1. DIANA CHAPMAN (Conscious Leadership)
+- Above/below the line awareness
+- Drama triangle (victim/villain/hero)
+- Fact vs. story distinction
+- Body-based awareness
+- Radical responsibility
+- "Where are you right now - above or below the line?"
+
+2. BRUCE TIFT (Developmental/Relational)
+- "Already Free" - nothing to fix
+- Developmental trauma and adaptive strategies
+- The invitation to feel what we've been avoiding
+- Holding paradox rather than resolving it
+- Relationship as practice ground
+- "What if this experience is not a problem to solve?"
+
+3. FRITZ PERLS (Gestalt)
+- Present-moment awareness ("What are you aware of right now?")
+- Unfinished business and incomplete gestalts
+- Empty chair technique
+- "How" and "what" over "why"
+- Contact and withdrawal
+- "What do you experience as you say that?"
+
+Respond with this exact JSON format:
 {
-  "leadingQuestions": [
-    "3-5 powerful questions the coach might ask to catalyze transformation, in Diana's direct style"
+  "dianaChapman": [
+    "3-4 questions Diana Chapman would ask, in her direct style"
   ],
-  "blindSpots": [
-    "2-4 things the coach might be missing in the relational dynamic, patterns they may not be seeing, or ways they might be colluding with the client's story"
+  "bruceTift": [
+    "3-4 questions Bruce Tift would ask, with his gentle paradoxical approach"
   ],
-  "patterns": [
-    "2-3 patterns Diana would notice in the client's material - where are they below the line? What drama triangle roles are they playing?"
-  ],
-  "nextSteps": [
-    "2-3 concrete suggestions for the next session, in Diana's practical style"
+  "fritzPerls": [
+    "3-4 questions Fritz Perls would ask, focused on present-moment experience"
   ]
 }
 
 Respond ONLY with valid JSON, no additional text.`;
 }
 
+// Get a preview of what will be sent (for user approval)
+export function getAnonymizationPreview(client: Client): AnonymizationPreview {
+  const anonymizedData = anonymizeClientData(client);
+  const promptPreview = buildPrompt(anonymizedData);
+  return { anonymizedData, promptPreview };
+}
+
 export async function getCoachingInsights(
   apiKey: string,
-  client: Client
+  anonymizedData: AnonymizedClientData
 ): Promise<CoachingInsight> {
   const response = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',
@@ -76,7 +109,7 @@ export async function getCoachingInsights(
       messages: [
         {
           role: 'user',
-          content: buildPrompt(client),
+          content: buildPrompt(anonymizedData),
         },
       ],
     }),
@@ -114,10 +147,9 @@ export async function getCoachingInsights(
 
     const insight = JSON.parse(jsonContent);
     return {
-      leadingQuestions: insight.leadingQuestions || [],
-      blindSpots: insight.blindSpots || [],
-      patterns: insight.patterns || [],
-      nextSteps: insight.nextSteps || [],
+      dianaChapman: insight.dianaChapman || [],
+      bruceTift: insight.bruceTift || [],
+      fritzPerls: insight.fritzPerls || [],
     };
   } catch {
     throw new Error('Failed to parse Claude response');
