@@ -1,11 +1,23 @@
 {
-  "name": "shrimpwelfare",
+  "name": "coaching-crm",
+  "productName": "Coaching CRM",
+  "version": "1.0.0",
+  "description": "Secure, local-first CRM for coaching practice",
+  "author": "Your Name",
+  "license": "MIT",
+  "main": "electron/main.js",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:electron": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "build": "tsc -b && vite build",
+    "build:electron": "npm run build && tsc -p electron/tsconfig.json",
+    "start:electron": "electron .",
+    "package": "npm run build:electron && electron-builder",
+    "package:mac": "npm run build:electron && electron-builder --mac",
+    "package:win": "npm run build:electron && electron-builder --win",
+    "package:linux": "npm run build:electron && electron-builder --linux",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -21,12 +33,56 @@
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "concurrently": "^9.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "electron-squirrel-startup": "^1.0.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.46.4",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "wait-on": "^8.0.0"
+  },
+  "build": {
+    "appId": "com.coaching.crm",
+    "productName": "Coaching CRM",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*.js",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "linux": {
+      "category": "Office",
+      "icon": "build/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

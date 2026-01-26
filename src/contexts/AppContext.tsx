@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import type { Client } from '../types';
-import { hasExistingData, initializeWithPassword, verifyPassword, loadClients, saveClients, loadSettings, saveSettings } from '../utils/storage';
+import { hasExistingData, initializeWithPassword, verifyPassword, loadClients, saveClients, loadSettings, saveSettings, isElectron, autoSaveToDropbox } from '../utils/storage';
 
 interface AppContextType {
   isUnlocked: boolean;
@@ -130,6 +130,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await saveSettings({ ...settings, anthropicApiKey: key }, password);
   }, [password]);
 
+  // Helper to save clients and auto-backup to Dropbox (if in Electron)
+  const saveAndBackup = useCallback(async (clientsToSave: Client[]) => {
+    if (!password) return;
+    await saveClients(clientsToSave, password);
+    setClients(clientsToSave);
+
+    // Auto-backup to Dropbox in Electron (non-blocking)
+    if (isElectron()) {
+      autoSaveToDropbox().catch(err => {
+        console.warn('Auto-backup to Dropbox failed:', err);
+      });
+    }
+  }, [password]);
+
   const addClient = useCallback(async (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!password) return;
 
@@ -142,9 +156,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     const updated = [...clients, newClient];
-    await saveClients(updated, password);
-    setClients(updated);
-  }, [clients, password]);
+    await saveAndBackup(updated);
+  }, [clients, password, saveAndBackup]);
 
   const updateClient = useCallback(async (id: string, updates: Partial<Client>) => {
     if (!password) return;
@@ -154,17 +167,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ? { ...client, ...updates, updatedAt: new Date().toISOString() }
         : client
     );
-    await saveClients(updated, password);
-    setClients(updated);
-  }, [clients, password]);
+    await saveAndBackup(updated);
+  }, [clients, password, saveAndBackup]);
 
   const deleteClient = useCallback(async (id: string) => {
     if (!password) return;
 
     const updated = clients.filter(client => client.id !== id);
-    await saveClients(updated, password);
-    setClients(updated);
-  }, [clients, password]);
+    await saveAndBackup(updated);
+  }, [clients, password, saveAndBackup]);
 
   const getClient = useCallback((id: string) => {
     return clients.find(client => client.id === id);

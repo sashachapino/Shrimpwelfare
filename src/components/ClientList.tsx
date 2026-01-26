@@ -1,13 +1,13 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive, Settings, Download, Upload, X } from 'lucide-react';
+import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive, Settings, Download, Upload, X, Cloud, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useCalendar } from '../contexts/CalendarContext';
 import { AllianceIndicator } from './AllianceIndicator';
 import { EnneagramIndicator } from './EnneagramIndicator';
 import { UpcomingCalls } from './UpcomingCalls';
 import { PostCallNotifications } from './PostCallNotifications';
-import { downloadBackup, restoreFromBackup } from '../utils/storage';
+import { downloadBackup, restoreFromBackup, isElectron, getDropboxBackupPath, listDropboxBackups, restoreFromDropboxBackup } from '../utils/storage';
 import type { Client } from '../types';
 import styles from './ClientList.module.css';
 
@@ -69,9 +69,19 @@ export function ClientList() {
   const [showSettings, setShowSettings] = useState(false);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [dropboxPath, setDropboxPath] = useState<string | null>(null);
+  const [recentBackups, setRecentBackups] = useState<Array<{ name: string; path: string; date: Date }>>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
+
+  // Load Dropbox info when settings open (Electron only)
+  useEffect(() => {
+    if (showSettings && isElectron()) {
+      getDropboxBackupPath().then(setDropboxPath);
+      listDropboxBackups().then(backups => setRecentBackups(backups.slice(0, 5)));
+    }
+  }, [showSettings]);
 
   const scrollToCalendar = () => {
     calendarRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -107,6 +117,20 @@ export function ClientList() {
     }
     // Reset file input
     e.target.value = '';
+  };
+
+  const handleRestoreFromDropbox = async (filepath: string) => {
+    if (!password) return;
+    setRestoreError(null);
+    try {
+      await restoreFromDropboxBackup(filepath, password);
+      await reloadClients();
+      setShowSettings(false);
+      setBackupStatus('Backup restored successfully!');
+      setTimeout(() => setBackupStatus(null), 3000);
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : 'Failed to restore backup');
+    }
   };
 
   // Filter out archived clients
@@ -331,10 +355,44 @@ export function ClientList() {
             <div className={styles.modalContent}>
               <div className={styles.settingsSection}>
                 <h3>Backup & Restore</h3>
-                <p className={styles.settingsDescription}>
-                  Your data is encrypted locally. Export a backup file to save to Dropbox
-                  or another cloud folder for safekeeping.
-                </p>
+
+                {isElectron() && dropboxPath ? (
+                  <>
+                    <div className={styles.dropboxStatus}>
+                      <Cloud size={18} />
+                      <div>
+                        <strong>Auto-backup enabled</strong>
+                        <span>Saving to: {dropboxPath}</span>
+                      </div>
+                      <CheckCircle2 size={18} className={styles.checkIcon} />
+                    </div>
+
+                    {recentBackups.length > 0 && (
+                      <div className={styles.recentBackups}>
+                        <h4>Recent backups:</h4>
+                        <ul>
+                          {recentBackups.map((backup, i) => (
+                            <li key={i}>
+                              <span>{backup.name}</span>
+                              <button
+                                onClick={() => handleRestoreFromDropbox(backup.path)}
+                                className={styles.restoreBtn}
+                              >
+                                Restore
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className={styles.settingsDescription}>
+                    {isElectron()
+                      ? 'Dropbox folder not found. Backups will prompt you to choose a location.'
+                      : 'Your data is encrypted locally. Export a backup file to save to Dropbox or another cloud folder.'}
+                  </p>
+                )}
 
                 <div className={styles.backupActions}>
                   <button onClick={handleBackup} className="btn-accent">
@@ -343,7 +401,7 @@ export function ClientList() {
                   </button>
                   <button onClick={handleRestoreClick} className="btn-secondary">
                     <Upload size={18} />
-                    Restore from Backup
+                    Restore from File
                   </button>
                   <input
                     ref={fileInputRef}
@@ -360,7 +418,9 @@ export function ClientList() {
 
                 <p className={styles.backupNote}>
                   Backup files are fully encrypted with your password.
-                  Safe to store in Dropbox, Google Drive, etc.
+                  {isElectron()
+                    ? ' Auto-backups are saved every time you make changes.'
+                    : ' Safe to store in Dropbox, Google Drive, etc.'}
                 </p>
               </div>
             </div>

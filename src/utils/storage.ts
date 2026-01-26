@@ -232,3 +232,80 @@ export async function restoreFromBackup(file: File, password: string): Promise<v
 
   await importEncryptedBackup(backup, password);
 }
+
+// ============================================
+// Electron-specific functions for Dropbox backup
+// ============================================
+
+// Check if running in Electron
+export function isElectron(): boolean {
+  return typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
+}
+
+// Auto-save backup to Dropbox (Electron only)
+export async function autoSaveToDropbox(): Promise<{ success: boolean; path?: string; error?: string }> {
+  if (!isElectron()) {
+    return { success: false, error: 'Not running in Electron' };
+  }
+
+  try {
+    const backup = await exportEncryptedBackup();
+    const json = JSON.stringify(backup, null, 2);
+    const result = await window.electronAPI!.saveBackup(json);
+    return result;
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
+// Get Dropbox backup folder path (Electron only)
+export async function getDropboxBackupPath(): Promise<string | null> {
+  if (!isElectron()) return null;
+  return window.electronAPI!.getBackupFolder();
+}
+
+// List backups in Dropbox folder (Electron only)
+export async function listDropboxBackups(): Promise<Array<{ name: string; path: string; date: Date }>> {
+  if (!isElectron()) return [];
+  return window.electronAPI!.listBackups();
+}
+
+// Restore from a Dropbox backup file (Electron only)
+export async function restoreFromDropboxBackup(filepath: string, password: string): Promise<void> {
+  if (!isElectron()) {
+    throw new Error('Not running in Electron');
+  }
+
+  const content = await window.electronAPI!.readBackup(filepath);
+  if (!content) {
+    throw new Error('Could not read backup file');
+  }
+
+  const backup = JSON.parse(content) as EncryptedBackup;
+
+  if (!backup.version || !backup.passwordHash) {
+    throw new Error('Invalid backup file format');
+  }
+
+  await importEncryptedBackup(backup, password);
+}
+
+// Open file picker to restore from any backup file (Electron only)
+export async function selectAndRestoreBackup(password: string): Promise<void> {
+  if (!isElectron()) {
+    throw new Error('Not running in Electron');
+  }
+
+  const content = await window.electronAPI!.selectBackupFile();
+  if (!content) {
+    throw new Error('No file selected');
+  }
+
+  const backup = JSON.parse(content) as EncryptedBackup;
+
+  if (!backup.version || !backup.passwordHash) {
+    throw new Error('Invalid backup file format');
+  }
+
+  await importEncryptedBackup(backup, password);
+}
