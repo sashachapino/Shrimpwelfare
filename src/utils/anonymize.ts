@@ -7,15 +7,36 @@ export interface AnonymizationResult {
 
 // Common first names to detect (extend as needed)
 const COMMON_NAMES = new Set([
+  // Male names
   'james', 'john', 'robert', 'michael', 'william', 'david', 'richard', 'joseph', 'thomas', 'charles',
-  'mary', 'patricia', 'jennifer', 'linda', 'elizabeth', 'barbara', 'susan', 'jessica', 'sarah', 'karen',
   'christopher', 'daniel', 'matthew', 'anthony', 'mark', 'donald', 'steven', 'paul', 'andrew', 'joshua',
-  'nancy', 'betty', 'margaret', 'sandra', 'ashley', 'dorothy', 'kimberly', 'emily', 'donna', 'michelle',
   'kevin', 'brian', 'george', 'edward', 'ronald', 'timothy', 'jason', 'jeffrey', 'ryan', 'jacob',
+  'adam', 'nathan', 'henry', 'peter', 'scott', 'patrick', 'jack', 'dennis', 'jerry', 'tyler',
+  'aaron', 'jose', 'douglas', 'noah', 'ethan', 'jeremy', 'walter', 'christian', 'keith', 'roger',
+  'terry', 'austin', 'sean', 'gerald', 'carl', 'harold', 'dylan', 'arthur', 'lawrence', 'jordan',
+  'jesse', 'bryan', 'billy', 'bruce', 'gabriel', 'joe', 'logan', 'albert', 'willie', 'alan',
+  'eugene', 'russell', 'vincent', 'philip', 'bobby', 'johnny', 'bradley', 'roy', 'ralph', 'eugene',
+  // Female names
+  'mary', 'patricia', 'jennifer', 'linda', 'elizabeth', 'barbara', 'susan', 'jessica', 'sarah', 'karen',
+  'nancy', 'betty', 'margaret', 'sandra', 'ashley', 'dorothy', 'kimberly', 'emily', 'donna', 'michelle',
   'carol', 'amanda', 'melissa', 'deborah', 'stephanie', 'rebecca', 'sharon', 'laura', 'cynthia', 'kathleen',
+  'amy', 'angela', 'shirley', 'anna', 'brenda', 'pamela', 'emma', 'nicole', 'helen', 'samantha',
+  'katherine', 'christine', 'debra', 'rachel', 'carolyn', 'janet', 'catherine', 'maria', 'heather', 'diane',
+  'ruth', 'julie', 'olivia', 'joyce', 'virginia', 'victoria', 'kelly', 'lauren', 'christina', 'joan',
+  'evelyn', 'judith', 'megan', 'andrea', 'cheryl', 'hannah', 'jacqueline', 'martha', 'gloria', 'teresa',
+  'ann', 'sara', 'madison', 'frances', 'kathryn', 'janice', 'jean', 'abigail', 'alice', 'judy',
+  'sophia', 'grace', 'denise', 'amber', 'doris', 'marilyn', 'danielle', 'beverly', 'isabella', 'theresa',
+  'diana', 'natalie', 'brittany', 'charlotte', 'marie', 'kayla', 'alexis', 'lori', 'julia', 'tanya', 'tania',
+  // Gender-neutral / additional names
   'alex', 'sam', 'taylor', 'jordan', 'casey', 'morgan', 'riley', 'jamie', 'cameron', 'drew',
+  'avery', 'peyton', 'quinn', 'skyler', 'charlie', 'finley', 'sage', 'rowan', 'hayden', 'reese',
+  // Nicknames and short forms
   'mike', 'dave', 'bob', 'bill', 'tom', 'joe', 'jim', 'dan', 'matt', 'chris', 'steve', 'jeff', 'ben',
-  'kate', 'katie', 'jenny', 'jess', 'meg', 'liz', 'beth', 'sue', 'amy', 'ann', 'kim', 'lisa', 'sara',
+  'kate', 'katie', 'jenny', 'jess', 'meg', 'liz', 'beth', 'sue', 'kim', 'lisa', 'vicky', 'becky',
+  'tony', 'nick', 'rick', 'will', 'ed', 'ted', 'rob', 'jon', 'tim', 'greg', 'larry', 'harry',
+  'abby', 'ally', 'angie', 'barb', 'carrie', 'cathy', 'cindy', 'deb', 'debbie', 'gabby', 'jackie',
+  'jan', 'kat', 'kathy', 'maggie', 'mandy', 'margie', 'mia', 'pam', 'patty', 'penny', 'sandy', 'steph',
+  'tina', 'trish', 'val', 'wendy', 'zoe',
 ]);
 
 // Patterns for detecting various PII
@@ -147,6 +168,36 @@ const JOB_TITLES: RegExp[] = [
   /\bprofessor\b/gi,
   /\btherapist\b/gi,
   /\baccountant\b/gi,
+  // Religious titles
+  /\b(?:unitarian\s+universalist\s+)?minister\b/gi,
+  /\bpastor\b/gi,
+  /\breverend\b/gi,
+  /\brev\.\b/gi,
+  /\bpriest\b/gi,
+  /\brabbi\b/gi,
+  /\bimam\b/gi,
+  /\bchaplain\b/gi,
+  /\bdeacon\b/gi,
+  /\bbishop\b/gi,
+  /\bcantor\b/gi,
+  /\belder\b/gi,
+  /\bpastor\b/gi,
+  // Healthcare
+  /\bpsychologist\b/gi,
+  /\bpsychiatrist\b/gi,
+  /\bcounselor\b/gi,
+  /\bsocial\s+worker\b/gi,
+  // Other professions
+  /\bwriter\b/gi,
+  /\bjournalist\b/gi,
+  /\beditor\b/gi,
+  /\bartist\b/gi,
+  /\bmusician\b/gi,
+  /\bactor\b/gi,
+  /\bchef\b/gi,
+  /\bpilot\b/gi,
+  /\bscientist\b/gi,
+  /\bresearcher\b/gi,
 ];
 
 // Common company indicators
