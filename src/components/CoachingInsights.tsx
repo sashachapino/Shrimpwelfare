@@ -40,6 +40,7 @@ class CoachingInsightsErrorBoundary extends Component<{ children: ReactNode }, E
             <AlertCircle size={20} />
             <p>Something went wrong: {this.state.error?.message || 'Unknown error'}</p>
             <button
+              type="button"
               onClick={() => this.setState({ hasError: false, error: null })}
               className="btn-secondary"
             >
@@ -270,6 +271,7 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
     const dianaQuestions = insights?.dianaChapman ?? [];
     const bruceQuestions = insights?.bruceTift ?? [];
     const fritzQuestions = insights?.fritzPerls ?? [];
+    const genpoQuestions = insights?.genpoRoshi ?? [];
     const summaryParagraphs = typeof plotSummary === 'string' ? plotSummary.split('\n\n') : [];
 
     return (
@@ -338,6 +340,18 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
               </h3>
               <ul>
                 {fritzQuestions.map((q, i) => (
+                  <li key={i}>{q}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className={styles.insightSection}>
+              <h3 className={styles.perspectiveTitle}>
+                Genpo Roshi
+                <span className={styles.perspectiveSubtitle}>Big Mind Process</span>
+              </h3>
+              <ul>
+                {genpoQuestions.map((q, i) => (
                   <li key={i}>{q}</li>
                 ))}
               </ul>
