@@ -199,6 +199,14 @@
   border-left: 2px solid #d8b4fe;
 }
 
+.impression {
+  font-size: var(--text-sm);
+  color: var(--color-text-primary);
+  line-height: 1.6;
+  padding-left: var(--space-sm);
+  border-left: 2px solid #d8b4fe;
+}
+
 /* Preview Section */
 .previewSection {
   display: flex;

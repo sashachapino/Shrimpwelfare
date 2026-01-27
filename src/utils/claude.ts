@@ -13,6 +13,13 @@ export interface CoachingInsight {
   genpoRoshi: { vitalMatter: string; questions: string[] };
 }
 
+export interface CaseSummary {
+  dianaChapman: { impression: string };
+  bruceTift: { impression: string };
+  jonathanShedler: { impression: string };
+  genpoRoshi: { impression: string };
+}
+
 export interface AnonymizationPreview {
   anonymizedData: AnonymizedClientData;
   promptPreview: string;
@@ -172,32 +179,78 @@ export async function getCoachingInsights(
   }
 }
 
-// Build prompt for plot summary
+// Build prompt for case summary (four perspectives)
 function buildPlotSummaryPrompt(data: AnonymizedClientData): string {
   const sessionNotesText = data.sessionNotes
     .sort((a, b) => a.sessionNumber - b.sessionNumber)
     .map(s => `Session ${s.sessionNumber}:\n${s.notes || '(no notes)'}`)
     .join('\n\n');
 
-  return `You are a minimalist writer in the style of Raymond Carver. Your task is to write a brief, understated summary of this coaching engagement as if it were the arc of a short story.
+  const enneagramInfo = data.enneagramType !== '?'
+    ? `Enneagram: Type ${data.enneagramType}${data.enneagramSecondary ? `/${data.enneagramSecondary}` : ''}`
+    : '';
 
-Write in third person. Use simple, declarative sentences. No judgments, no analysis, no advice. Just the facts of what happened, what was explored, what shifted. Like Carver, find the quiet drama in ordinary moments.
+  return `You are helping a coach by generating case impressions from four distinct therapeutic perspectives. Review the anonymized client notes below.
 
-Keep it to 3-5 short paragraphs. No more than 150 words total.
+IMPORTANT: The notes may be incomplete or ambiguous. You cannot know who is the coach and who is the client from the notes alone. Do not make assumptions about dynamics or what is "really" happening. Offer pattern-matching and tentative impressions, acknowledging uncertainty.
 
-Here is the material:
-
-Sessions completed: ${data.sessionsCompleted}
+${enneagramInfo ? enneagramInfo + '\n' : ''}Sessions completed: ${data.sessionsCompleted}
+Alliance strength: ${data.allianceStrength}/10
 
 OVERALL NOTES:
 ${data.overallNotes || '(none)'}
+
+CURRENT QUESTIONS THE COACH IS HOLDING:
+${data.currentQuestions || '(none)'}
 
 SESSION NOTES:
 ${sessionNotesText || '(no session notes yet)'}
 
 ---
 
-Write the plot summary now. Remember: minimal, factual, Carver-esque. No platitudes, no coaching language, no emotional interpretations. Just what happened.`;
+For each of the four perspectives below, provide their sense of the case - what patterns they notice, what the situation might feel like from their lens. Keep it tentative and acknowledge missing information.
+
+1. DIANA CHAPMAN (Conscious Leadership)
+- Above/below the line awareness
+- Drama triangle (victim/villain/hero)
+- Fact vs. story distinction
+- Body-based awareness and radical responsibility
+
+2. BRUCE TIFT (Developmental/Relational)
+- "Already Free" - nothing to fix
+- Developmental trauma and adaptive strategies
+- The invitation to feel what we've been avoiding
+- Holding paradox rather than resolving it
+
+3. JONATHAN SHEDLER (Psychodynamic)
+- Recurring patterns and themes across relationships
+- What is being enacted vs. spoken about
+- Defenses as adaptations that once made sense
+- The therapeutic relationship as data
+
+4. GENPO ROSHI (Big Mind Process)
+- Voice dialogue with different aspects of self
+- Speaking AS different voices (not about them)
+- Big Mind/Big Heart - the awakened perspective
+- The Controller, the Protector, the Skeptic
+
+Respond with this exact JSON format:
+{
+  "dianaChapman": {
+    "impression": "2-3 sentences on what Diana Chapman might notice or sense about this case, acknowledging uncertainty"
+  },
+  "bruceTift": {
+    "impression": "2-3 sentences on what Bruce Tift might notice or sense about this case"
+  },
+  "jonathanShedler": {
+    "impression": "2-3 sentences on what Jonathan Shedler might notice or sense about this case"
+  },
+  "genpoRoshi": {
+    "impression": "2-3 sentences on what Genpo Roshi might notice or sense about this case"
+  }
+}
+
+Respond ONLY with valid JSON, no additional text.`;
 }
 
 export function getPlotSummaryPreview(client: Client): AnonymizationPreview {
@@ -209,7 +262,7 @@ export function getPlotSummaryPreview(client: Client): AnonymizationPreview {
 export async function getPlotSummary(
   apiKey: string,
   anonymizedData: AnonymizedClientData
-): Promise<string> {
+): Promise<CaseSummary> {
   const response = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',
     headers: {
@@ -220,7 +273,7 @@ export async function getPlotSummary(
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 500,
+      max_tokens: 1500,
       messages: [
         {
           role: 'user',
@@ -242,5 +295,26 @@ export async function getPlotSummary(
     throw new Error('No response from Claude');
   }
 
-  return content.trim();
+  try {
+    // Parse the JSON response - handle potential markdown code blocks
+    let jsonContent = content.trim();
+
+    // Remove markdown code blocks if present
+    const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (jsonMatch) {
+      jsonContent = jsonMatch[1].trim();
+    }
+
+    // Also try to extract JSON object if there's surrounding text
+    if (!jsonContent.startsWith('{')) {
+      const objectMatch = jsonContent.match(/\{[\s\S]*\}/);
+      if (objectMatch) {
+        jsonContent = objectMatch[0];
+      }
+    }
+
+    return JSON.parse(jsonContent) as CaseSummary;
+  } catch {
+    throw new Error('Failed to parse Claude response');
+  }
 }
