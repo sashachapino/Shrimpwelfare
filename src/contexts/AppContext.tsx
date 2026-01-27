@@ -26,12 +26,17 @@ const AppContext = createContext<AppContextType | null>(null);
 
 // Migrate old client data to include new fields
 function migrateClient(client: Partial<Client> & { enneagramWing?: number | null }): Client {
+  // Migrate enneagramWing to enneagramSecondary if it exists
+  const enneagramSecondary = client.enneagramSecondary !== undefined
+    ? client.enneagramSecondary
+    : (client.enneagramWing as Client['enneagramSecondary']) ?? null;
+
   return {
     id: client.id ?? crypto.randomUUID(),
     name: client.name ?? '',
     email: client.email ?? '',
     enneagramType: client.enneagramType ?? '?',
-    enneagramSecondary: client.enneagramSecondary ?? null, // migrated from enneagramWing
+    enneagramSecondary,
     status: client.status ?? 'active',
     sessionsCompleted: client.sessionsCompleted ?? 0,
     unpaidHours: client.unpaidHours ?? (client as { unpaidSessions?: number }).unpaidSessions ?? 0,
