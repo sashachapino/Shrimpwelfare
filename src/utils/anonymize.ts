@@ -244,10 +244,10 @@ export function anonymizeText(text: string, clientName: string): AnonymizationRe
   // 7. Replace job titles
   let jobCount = 0;
   for (const pattern of JOB_TITLES) {
-    if (pattern.test(result)) {
-      jobCount++;
-      result = result.replace(pattern, '[their role]');
-    }
+    pattern.lastIndex = 0; // Reset global regex state
+    const before = result;
+    result = result.replace(pattern, '[their role]');
+    if (result !== before) jobCount++;
   }
   if (jobCount > 0) {
     replacements.push(`Replaced job title(s) with [their role]`);
@@ -256,10 +256,10 @@ export function anonymizeText(text: string, clientName: string): AnonymizationRe
   // 8. Replace company names
   let companyCount = 0;
   for (const pattern of COMPANY_PATTERNS) {
-    if (pattern.test(result)) {
-      companyCount++;
-      result = result.replace(pattern, (match) => match.replace(/[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?/, '[company]'));
-    }
+    pattern.lastIndex = 0; // Reset global regex state
+    const before = result;
+    result = result.replace(pattern, (match) => match.replace(/[A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?/, '[company]'));
+    if (result !== before) companyCount++;
   }
   if (companyCount > 0) {
     replacements.push(`Replaced company reference(s) with [company]`);
@@ -269,10 +269,9 @@ export function anonymizeText(text: string, clientName: string): AnonymizationRe
   let cityCount = 0;
   for (const city of CITIES) {
     const cityRegex = new RegExp(`\\b${escapeRegex(city)}\\b`, 'gi');
-    if (cityRegex.test(result)) {
-      cityCount++;
-      result = result.replace(cityRegex, '[city]');
-    }
+    const before = result;
+    result = result.replace(cityRegex, '[city]');
+    if (result !== before) cityCount++;
   }
   if (cityCount > 0) {
     replacements.push(`Replaced ${cityCount} city name(s) with [city]`);
@@ -281,10 +280,10 @@ export function anonymizeText(text: string, clientName: string): AnonymizationRe
   // 10. Replace gendered relationship terms
   let genderedTermCount = 0;
   for (const [pattern, replacement] of GENDERED_TERMS) {
-    if (pattern.test(result)) {
-      genderedTermCount++;
-      result = result.replace(pattern, replacement);
-    }
+    pattern.lastIndex = 0; // Reset global regex state
+    const before = result;
+    result = result.replace(pattern, replacement);
+    if (result !== before) genderedTermCount++;
   }
   if (genderedTermCount > 0) {
     replacements.push(`Neutralized gendered relationship terms`);
@@ -293,10 +292,10 @@ export function anonymizeText(text: string, clientName: string): AnonymizationRe
   // 11. Replace gender pronouns (do this last to avoid double-replacement)
   let pronounCount = 0;
   for (const [pattern, replacement] of GENDER_PRONOUNS) {
-    if (pattern.test(result)) {
-      pronounCount++;
-      result = result.replace(pattern, replacement);
-    }
+    pattern.lastIndex = 0; // Reset global regex state
+    const before = result;
+    result = result.replace(pattern, replacement);
+    if (result !== before) pronounCount++;
   }
   if (pronounCount > 0) {
     replacements.push(`Neutralized gender pronouns to they/them/their`);

@@ -52,10 +52,15 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
       return;
     }
     setActiveFeature(feature);
-    const previewData = feature === 'plotSummary'
-      ? getPlotSummaryPreview(client)
-      : getAnonymizationPreview(client);
-    setPreview(previewData);
+    setError(null);
+    try {
+      const previewData = feature === 'plotSummary'
+        ? getPlotSummaryPreview(client)
+        : getAnonymizationPreview(client);
+      setPreview(previewData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate preview');
+    }
   };
 
   const handleConfirmSend = async () => {
