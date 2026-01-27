@@ -30,7 +30,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [preview, setPreview] = useState<AnonymizationPreview | null>(null);
   const [showFullPreview, setShowFullPreview] = useState(false);
-  const [renderKey, setRenderKey] = useState(0); // Force re-render mechanism
+  const [renderKey] = useState(0); // For keying elements
 
   // Use refs to avoid stale closure issues in async handlers
   const previewRef = useRef(preview);
@@ -42,6 +42,23 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
     activeFeatureRef.current = activeFeature;
     apiKeyRef.current = anthropicApiKey;
   }, [preview, activeFeature, anthropicApiKey]);
+
+  // Debug: Track focus changes
+  useEffect(() => {
+    const onFocus = () => console.log('>>> Window GAINED focus');
+    const onBlur = () => console.log('>>> Window LOST focus');
+    const onVisChange = () => console.log('>>> Visibility changed:', document.visibilityState);
+
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVisChange);
+
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisChange);
+    };
+  }, []);
 
   // Direct function - no useCallback to avoid stale closure issues
   const handleShowPreview = (feature: ActiveFeature) => {
@@ -104,6 +121,8 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
 
   const handleConfirmSend = async () => {
     console.log('=== handleConfirmSend START ===');
+    console.log('Active element before:', document.activeElement?.tagName, document.activeElement?.className);
+    console.log('Document has focus:', document.hasFocus());
 
     // Use refs to get current values (avoid stale closures)
     const currentApiKey = apiKeyRef.current;
@@ -124,42 +143,41 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
     }
 
     console.log('Setting loading state...');
-
-    // Update state synchronously
-    setRenderKey(k => k + 1);
     setLoading(true);
     setError(null);
 
-    // Force a synchronous DOM update
-    await new Promise<void>(resolve => {
-      setTimeout(() => {
-        console.log('After timeout, loading should be visible');
-        resolve();
-      }, 100);
-    });
+    // Check focus after state update
+    console.log('After setLoading - Document has focus:', document.hasFocus());
+    console.log('Active element after setLoading:', document.activeElement?.tagName);
 
     try {
       console.log('Making API call for:', currentFeature);
+      console.log('Before fetch - Document has focus:', document.hasFocus());
+
+      let result;
       if (currentFeature === 'plotSummary') {
-        const result = await getPlotSummary(currentApiKey, currentPreview.anonymizedData);
+        result = await getPlotSummary(currentApiKey, currentPreview.anonymizedData);
         console.log('Got plot summary result');
         setPlotSummary(result);
       } else {
-        const result = await getCoachingInsights(currentApiKey, currentPreview.anonymizedData);
+        result = await getCoachingInsights(currentApiKey, currentPreview.anonymizedData);
         console.log('Got coaching insights result');
         setInsights(result);
       }
+
+      console.log('After API call - Document has focus:', document.hasFocus());
+
       setPreview(null);
-      setRenderKey(k => k + 1);
       console.log('=== handleConfirmSend END (success) ===');
     } catch (err) {
       console.error('API call error:', err);
       setError(err instanceof Error ? err.message : 'Failed to get response');
-      setRenderKey(k => k + 1);
       console.log('=== handleConfirmSend END (error) ===');
     } finally {
       setLoading(false);
-      setRenderKey(k => k + 1);
+      // Force focus back to document
+      window.focus();
+      console.log('Final - Document has focus:', document.hasFocus());
     }
   };
 
