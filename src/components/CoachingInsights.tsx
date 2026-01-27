@@ -7,6 +7,7 @@ import {
   getPlotSummary,
   getPlotSummaryPreview,
   type CoachingInsight,
+  type CaseSummary,
   type AnonymizedClientData
 } from '../utils/claude';
 import type { Client } from '../types';
@@ -21,14 +22,14 @@ type State =
   | { status: 'preview'; feature: FeatureType; anonymizedData: AnonymizedClientData; promptPreview: string }
   | { status: 'loading'; feature: FeatureType; anonymizedData: AnonymizedClientData }
   | { status: 'error'; message: string; feature: FeatureType }
-  | { status: 'success'; insights: CoachingInsight | null; plotSummary: string | null };
+  | { status: 'success'; insights: CoachingInsight | null; caseSummary: CaseSummary | null };
 
 type Action =
   | { type: 'START_FEATURE'; feature: FeatureType; hasApiKey: boolean; anonymizedData: AnonymizedClientData; promptPreview: string }
   | { type: 'API_KEY_SAVED'; anonymizedData: AnonymizedClientData; promptPreview: string }
   | { type: 'CONFIRM_SEND' }
   | { type: 'CANCEL' }
-  | { type: 'SUCCESS'; insights?: CoachingInsight; plotSummary?: string }
+  | { type: 'SUCCESS'; insights?: CoachingInsight; caseSummary?: CaseSummary }
   | { type: 'ERROR'; message: string }
   | { type: 'RESET' };
 
@@ -68,11 +69,11 @@ function reducer(state: State, action: Action): State {
     case 'SUCCESS':
       // Merge with existing results if any
       const prevInsights = state.status === 'success' ? state.insights : null;
-      const prevPlotSummary = state.status === 'success' ? state.plotSummary : null;
+      const prevCaseSummary = state.status === 'success' ? state.caseSummary : null;
       return {
         status: 'success',
         insights: action.insights ?? prevInsights,
-        plotSummary: action.plotSummary ?? prevPlotSummary
+        caseSummary: action.caseSummary ?? prevCaseSummary
       };
 
     case 'ERROR':
@@ -136,7 +137,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
     try {
       if (state.feature === 'plotSummary') {
         const result = await getPlotSummary(anthropicApiKey, state.anonymizedData);
-        dispatch({ type: 'SUCCESS', plotSummary: result });
+        dispatch({ type: 'SUCCESS', caseSummary: result });
       } else {
         const result = await getCoachingInsights(anthropicApiKey, state.anonymizedData);
         dispatch({ type: 'SUCCESS', insights: result });
@@ -191,7 +192,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
     return (
       <ResultsScreen
         insights={state.insights}
-        plotSummary={state.plotSummary}
+        caseSummary={state.caseSummary}
         onRefresh={handleStartFeature}
       />
     );
@@ -207,7 +208,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
         </button>
         <button type="button" onClick={() => handleStartFeature('plotSummary')} className={styles.getInsightsBtn}>
           <BookOpen size={18} />
-          Plot Summary
+          Case Impressions
         </button>
       </div>
       <p className={styles.description}>
@@ -325,38 +326,49 @@ function PreviewScreen({
 
 function ResultsScreen({
   insights,
-  plotSummary,
+  caseSummary,
   onRefresh
 }: {
   insights: CoachingInsight | null;
-  plotSummary: string | null;
+  caseSummary: CaseSummary | null;
   onRefresh: (feature: FeatureType) => void;
 }) {
   const defaultPerspective = { vitalMatter: '', questions: [] };
-  const diana = insights?.dianaChapman ?? defaultPerspective;
-  const bruce = insights?.bruceTift ?? defaultPerspective;
-  const jonathan = insights?.jonathanShedler ?? defaultPerspective;
-  const genpo = insights?.genpoRoshi ?? defaultPerspective;
-  const summaryParagraphs = plotSummary?.split('\n\n') ?? [];
 
   return (
     <div className={styles.container}>
-      {plotSummary && (
+      {caseSummary && (
         <>
           <div className={styles.header}>
             <h2>
               <BookOpen size={20} />
-              Plot Summary
+              Case Impressions
             </h2>
             <button type="button" onClick={() => onRefresh('plotSummary')} className={styles.refreshBtn}>
               Refresh
             </button>
           </div>
-          <div className={styles.plotSummary}>
-            {summaryParagraphs.map((p, i) => (
-              <p key={i}>{p}</p>
-            ))}
-          </div>
+
+          <ImpressionSection
+            name="Diana Chapman"
+            subtitle="Conscious Leadership"
+            impression={caseSummary.dianaChapman?.impression ?? ''}
+          />
+          <ImpressionSection
+            name="Bruce Tift"
+            subtitle="Developmental/Relational"
+            impression={caseSummary.bruceTift?.impression ?? ''}
+          />
+          <ImpressionSection
+            name="Jonathan Shedler"
+            subtitle="Psychodynamic"
+            impression={caseSummary.jonathanShedler?.impression ?? ''}
+          />
+          <ImpressionSection
+            name="Genpo Roshi"
+            subtitle="Big Mind Process"
+            impression={caseSummary.genpoRoshi?.impression ?? ''}
+          />
         </>
       )}
 
@@ -365,25 +377,25 @@ function ResultsScreen({
           <div className={styles.header}>
             <h2>
               <Sparkles size={20} />
-              Coaching Insights
+              Coaching Questions
             </h2>
             <button type="button" onClick={() => onRefresh('questions')} className={styles.refreshBtn}>
               Refresh
             </button>
           </div>
 
-          <PerspectiveSection name="Diana Chapman" subtitle="Conscious Leadership" data={diana} />
-          <PerspectiveSection name="Bruce Tift" subtitle="Developmental/Relational" data={bruce} />
-          <PerspectiveSection name="Jonathan Shedler" subtitle="Psychodynamic" data={jonathan} />
-          <PerspectiveSection name="Genpo Roshi" subtitle="Big Mind Process" data={genpo} />
+          <PerspectiveSection name="Diana Chapman" subtitle="Conscious Leadership" data={insights.dianaChapman ?? defaultPerspective} />
+          <PerspectiveSection name="Bruce Tift" subtitle="Developmental/Relational" data={insights.bruceTift ?? defaultPerspective} />
+          <PerspectiveSection name="Jonathan Shedler" subtitle="Psychodynamic" data={insights.jonathanShedler ?? defaultPerspective} />
+          <PerspectiveSection name="Genpo Roshi" subtitle="Big Mind Process" data={insights.genpoRoshi ?? defaultPerspective} />
         </>
       )}
 
       <div className={styles.additionalActions}>
-        {!plotSummary && (
+        {!caseSummary && (
           <button type="button" onClick={() => onRefresh('plotSummary')} className={styles.secondaryActionBtn}>
             <BookOpen size={16} />
-            Get Plot Summary
+            Get Case Impressions
           </button>
         )}
         {!insights && (
@@ -420,6 +432,28 @@ function PerspectiveSection({
           <li key={i}>{q}</li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function ImpressionSection({
+  name,
+  subtitle,
+  impression
+}: {
+  name: string;
+  subtitle: string;
+  impression: string;
+}) {
+  return (
+    <div className={styles.insightSection}>
+      <h3 className={styles.perspectiveTitle}>
+        {name}
+        <span className={styles.perspectiveSubtitle}>{subtitle}</span>
+      </h3>
+      {impression && (
+        <p className={styles.impression}>{impression}</p>
+      )}
     </div>
   );
 }
