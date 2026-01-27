@@ -1,6 +1,9 @@
 import type { Client } from '../types';
 import { anonymizeClientData, type AnonymizedClientData } from './anonymize';
 
+// Re-export for use in components
+export type { AnonymizedClientData };
+
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
 export interface CoachingInsight {
