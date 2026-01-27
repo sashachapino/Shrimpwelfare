@@ -443,13 +443,6 @@ export function ClientDetail() {
           )}
         </section>
 
-        {/* AI Coaching Insights */}
-        {!isNew && existingClient && (
-          <section className={styles.insightsSection}>
-            <CoachingInsights client={existingClient} />
-          </section>
-        )}
-
         {/* Actions */}
         <div className={styles.actions}>
           <button type="submit" className={`btn-primary ${styles.saveBtn}`} disabled={saving}>
@@ -487,6 +480,13 @@ export function ClientDetail() {
           )}
         </div>
       </form>
+
+      {/* AI Coaching Insights - Outside form to avoid form submission issues */}
+      {!isNew && existingClient && (
+        <section className={styles.insightsSection}>
+          <CoachingInsights client={existingClient} />
+        </section>
+      )}
     </div>
   );
 }
