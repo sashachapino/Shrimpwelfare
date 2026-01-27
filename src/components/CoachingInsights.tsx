@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Component, type ReactNode } from 'react';
 import { Sparkles, Key, Loader2, AlertCircle, Shield, Eye, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import {
@@ -12,13 +12,64 @@ import {
 import type { Client } from '../types';
 import styles from './CoachingInsights.module.css';
 
+// Error boundary to catch render errors
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class CoachingInsightsErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('CoachingInsights error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className={styles.container}>
+          <div className={styles.error}>
+            <AlertCircle size={20} />
+            <p>Something went wrong: {this.state.error?.message || 'Unknown error'}</p>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="btn-secondary"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 type ActiveFeature = 'questions' | 'plotSummary' | null;
 
 interface CoachingInsightsProps {
   client: Client;
 }
 
+// Wrapper with error boundary
 export function CoachingInsights({ client }: CoachingInsightsProps) {
+  return (
+    <CoachingInsightsErrorBoundary>
+      <CoachingInsightsInner client={client} />
+    </CoachingInsightsErrorBoundary>
+  );
+}
+
+function CoachingInsightsInner({ client }: CoachingInsightsProps) {
   const { anthropicApiKey, setAnthropicApiKey } = useApp();
   const [insights, setInsights] = useState<CoachingInsight | null>(null);
   const [plotSummary, setPlotSummary] = useState<string | null>(null);
