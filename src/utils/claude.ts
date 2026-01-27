@@ -7,6 +7,7 @@ export interface CoachingInsight {
   dianaChapman: string[];
   bruceTift: string[];
   fritzPerls: string[];
+  genpoRoshi: string[];
 }
 
 export interface AnonymizationPreview {
@@ -24,7 +25,7 @@ function buildPrompt(data: AnonymizedClientData): string {
     ? `Enneagram: Type ${data.enneagramType}${data.enneagramSecondary ? `/${data.enneagramSecondary}` : ''}`
     : '';
 
-  return `You are helping a coach by generating powerful questions from three distinct therapeutic perspectives. Review the anonymized client notes below and generate questions the coach could ask.
+  return `You are helping a coach by generating powerful questions from four distinct therapeutic perspectives. Review the anonymized client notes below and generate questions the coach could ask.
 
 IMPORTANT: Do not make assumptions about what is happening or analyze patterns. The notes may be incomplete or ambiguous. Simply generate questions that each practitioner would characteristically ask based on their approach.
 
@@ -42,7 +43,7 @@ ${sessionNotesText || '(no session notes yet)'}
 
 ---
 
-Generate questions from these three perspectives:
+Generate questions from these four perspectives:
 
 1. DIANA CHAPMAN (Conscious Leadership)
 - Above/below the line awareness
@@ -68,6 +69,14 @@ Generate questions from these three perspectives:
 - Contact and withdrawal
 - "What do you experience as you say that?"
 
+4. GENPO ROSHI (Big Mind Process)
+- Voice dialogue with different aspects of self
+- Speaking AS different voices (not about them)
+- Big Mind/Big Heart - the awakened perspective
+- The Controller, the Protector, the Skeptic
+- Non-dual awareness alongside dualistic voices
+- "May I speak to the voice of..." / "What does Big Mind have to say about this?"
+
 Respond with this exact JSON format:
 {
   "dianaChapman": [
@@ -78,6 +87,9 @@ Respond with this exact JSON format:
   ],
   "fritzPerls": [
     "3-4 questions Fritz Perls would ask, focused on present-moment experience"
+  ],
+  "genpoRoshi": [
+    "3-4 Big Mind process invitations Genpo Roshi would offer, inviting the client to speak AS different voices"
   ]
 }
 
@@ -105,7 +117,7 @@ export async function getCoachingInsights(
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 1500,
+      max_tokens: 2000,
       messages: [
         {
           role: 'user',
@@ -150,6 +162,7 @@ export async function getCoachingInsights(
       dianaChapman: insight.dianaChapman || [],
       bruceTift: insight.bruceTift || [],
       fritzPerls: insight.fritzPerls || [],
+      genpoRoshi: insight.genpoRoshi || [],
     };
   } catch {
     throw new Error('Failed to parse Claude response');
