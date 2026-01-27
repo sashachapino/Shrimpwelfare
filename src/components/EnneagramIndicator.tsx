@@ -1,11 +1,11 @@
-import type { EnneagramType, EnneagramWing } from '../types';
+import type { EnneagramType } from '../types';
 import styles from './EnneagramIndicator.module.css';
 
 interface EnneagramIndicatorProps {
   type: EnneagramType;
-  wing: EnneagramWing;
+  secondary: EnneagramType | null;
   size?: 'sm' | 'md' | 'lg';
-  onChange?: (type: EnneagramType, wing: EnneagramWing) => void;
+  onChange?: (type: EnneagramType, secondary: EnneagramType | null) => void;
 }
 
 const TYPE_NAMES: Record<EnneagramType, string> = {
@@ -21,41 +21,28 @@ const TYPE_NAMES: Record<EnneagramType, string> = {
   '?': 'Unknown',
 };
 
-const VALID_WINGS: Record<EnneagramType, EnneagramWing[]> = {
-  1: [9, 2, null],
-  2: [1, 3, null],
-  3: [2, 4, null],
-  4: [3, 5, null],
-  5: [4, 6, null],
-  6: [5, 7, null],
-  7: [6, 8, null],
-  8: [7, 9, null],
-  9: [8, 1, null],
-  '?': [null],
-};
-
 export function EnneagramIndicator({
   type,
-  wing,
+  secondary,
   size = 'md',
   onChange,
 }: EnneagramIndicatorProps) {
   const isInteractive = !!onChange;
   const displayType = type === '?' ? '?' : type;
-  const displayWing = wing !== null ? `w${wing}` : '';
-  const fullDisplay = wing !== null ? `${displayType}${displayWing}` : `${displayType}`;
+  const fullDisplay = secondary !== null && secondary !== '?'
+    ? `${displayType}/${secondary}`
+    : `${displayType}`;
 
   const handleTypeChange = (newType: EnneagramType) => {
     if (!onChange) return;
-    // Reset wing if changing type
-    const validWings = VALID_WINGS[newType];
-    const newWing = validWings.includes(wing) ? wing : null;
-    onChange(newType, newWing);
+    // Reset secondary if it matches the new primary
+    const newSecondary = secondary === newType ? null : secondary;
+    onChange(newType, newSecondary);
   };
 
-  const handleWingChange = (newWing: EnneagramWing) => {
+  const handleSecondaryChange = (newSecondary: EnneagramType | null) => {
     if (!onChange) return;
-    onChange(type, newWing);
+    onChange(type, newSecondary);
   };
 
   if (!isInteractive) {
@@ -73,7 +60,7 @@ export function EnneagramIndicator({
     <div className={`${styles.container} ${styles[size]} ${styles.interactive}`}>
       <div className={styles.selectors}>
         <div className={styles.field}>
-          <label>Type</label>
+          <label>Primary Type</label>
           <div className={styles.typeGrid}>
             {(['?', 1, 2, 3, 4, 5, 6, 7, 8, 9] as EnneagramType[]).map((t) => (
               <button
@@ -90,18 +77,27 @@ export function EnneagramIndicator({
 
         {type !== '?' && (
           <div className={styles.field}>
-            <label>Wing</label>
-            <div className={styles.wingOptions}>
-              {VALID_WINGS[type].map((w) => (
-                <button
-                  key={w ?? 'none'}
-                  type="button"
-                  className={`${styles.wingBtn} ${wing === w ? styles.selected : ''}`}
-                  onClick={() => handleWingChange(w)}
-                >
-                  {w === null ? 'None' : `w${w}`}
-                </button>
-              ))}
+            <label>Secondary Type (optional)</label>
+            <div className={styles.typeGrid}>
+              <button
+                type="button"
+                className={`${styles.typeBtn} ${secondary === null ? styles.selected : ''}`}
+                onClick={() => handleSecondaryChange(null)}
+              >
+                —
+              </button>
+              {([1, 2, 3, 4, 5, 6, 7, 8, 9] as EnneagramType[])
+                .filter(t => t !== type) // Can't be same as primary
+                .map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className={`${styles.typeBtn} ${secondary === t ? styles.selected : ''}`}
+                    onClick={() => handleSecondaryChange(t)}
+                  >
+                    {t}
+                  </button>
+                ))}
             </div>
           </div>
         )}
@@ -109,7 +105,10 @@ export function EnneagramIndicator({
 
       <div className={styles.preview}>
         <span className={styles.previewType}>{fullDisplay}</span>
-        <span className={styles.previewName}>{TYPE_NAMES[type]}</span>
+        <span className={styles.previewName}>
+          {TYPE_NAMES[type]}
+          {secondary !== null && secondary !== '?' && ` / ${TYPE_NAMES[secondary]}`}
+        </span>
       </div>
     </div>
   );

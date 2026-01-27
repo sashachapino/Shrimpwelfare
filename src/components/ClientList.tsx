@@ -46,7 +46,7 @@ function ClientCard({ client }: { client: Client }) {
         <div className={styles.indicators}>
           <EnneagramIndicator
             type={client.enneagramType ?? '?'}
-            wing={client.enneagramWing ?? null}
+            secondary={client.enneagramSecondary ?? null}
             size="sm"
           />
           <AllianceIndicator value={client.allianceStrength} size="sm" />

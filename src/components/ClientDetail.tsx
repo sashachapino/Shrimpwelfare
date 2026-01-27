@@ -17,14 +17,14 @@ import { AllianceIndicator } from './AllianceIndicator';
 import { EnneagramIndicator } from './EnneagramIndicator';
 import { SessionNotes } from './SessionNotes';
 import { CoachingInsights } from './CoachingInsights';
-import type { Client, SessionNote, EnneagramType, EnneagramWing, ClientStatus } from '../types';
+import type { Client, SessionNote, EnneagramType, ClientStatus } from '../types';
 import styles from './ClientDetail.module.css';
 
 const emptyClient: Omit<Client, 'id' | 'createdAt' | 'updatedAt'> = {
   name: '',
   email: '',
   enneagramType: '?',
-  enneagramWing: null,
+  enneagramSecondary: null,
   status: 'active',
   sessionsCompleted: 0,
   unpaidHours: 0,
@@ -284,10 +284,10 @@ export function ClientDetail() {
             <label>Enneagram Type</label>
             <EnneagramIndicator
               type={formData.enneagramType}
-              wing={formData.enneagramWing}
+              secondary={formData.enneagramSecondary}
               size="lg"
-              onChange={(type: EnneagramType, wing: EnneagramWing) =>
-                setFormData((prev) => ({ ...prev, enneagramType: type, enneagramWing: wing }))
+              onChange={(type: EnneagramType, secondary: EnneagramType | null) =>
+                setFormData((prev) => ({ ...prev, enneagramType: type, enneagramSecondary: secondary }))
               }
             />
           </div>

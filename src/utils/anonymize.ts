@@ -312,7 +312,7 @@ function escapeRegex(string: string): string {
 // Anonymize full client data for API request
 export interface AnonymizedClientData {
   enneagramType: string | number;
-  enneagramWing: string | number | null;
+  enneagramSecondary: string | number | null;
   sessionsCompleted: number;
   allianceStrength: number;
   overallNotes: string;
@@ -324,7 +324,7 @@ export interface AnonymizedClientData {
 export function anonymizeClientData(client: {
   name: string;
   enneagramType: string | number;
-  enneagramWing: string | number | null;
+  enneagramSecondary: string | number | null;
   sessionsCompleted: number;
   allianceStrength: number;
   overallNotes: string;
@@ -353,7 +353,7 @@ export function anonymizeClientData(client: {
 
   return {
     enneagramType: client.enneagramType,
-    enneagramWing: client.enneagramWing,
+    enneagramSecondary: client.enneagramSecondary,
     sessionsCompleted: client.sessionsCompleted,
     allianceStrength: client.allianceStrength,
     overallNotes: overallResult.text,
