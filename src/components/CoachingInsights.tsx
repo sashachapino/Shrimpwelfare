@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { Sparkles, Key, Loader2, AlertCircle, Shield, Eye, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import {
@@ -142,17 +143,23 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
       return;
     }
 
-    console.log('Setting loading state...');
-    setLoading(true);
-    setError(null);
+    console.log('Setting loading state with flushSync...');
 
-    // Check focus after state update
-    console.log('After setLoading - Document has focus:', document.hasFocus());
-    console.log('Active element after setLoading:', document.activeElement?.tagName);
+    // Force synchronous render of loading state
+    flushSync(() => {
+      setLoading(true);
+      setError(null);
+    });
+
+    console.log('After flushSync - loading should now be rendered');
+    console.log('Document has focus:', document.hasFocus());
+
+    // Double-check by reading DOM
+    const loadingBanner = document.querySelector('[style*="orange"]');
+    console.log('Loading banner in DOM:', !!loadingBanner);
 
     try {
       console.log('Making API call for:', currentFeature);
-      console.log('Before fetch - Document has focus:', document.hasFocus());
 
       let result;
       if (currentFeature === 'plotSummary') {
@@ -167,17 +174,22 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
 
       console.log('After API call - Document has focus:', document.hasFocus());
 
-      setPreview(null);
+      // Force synchronous render of results
+      flushSync(() => {
+        setPreview(null);
+        setLoading(false);
+      });
+
       console.log('=== handleConfirmSend END (success) ===');
+      window.focus();
     } catch (err) {
       console.error('API call error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to get response');
+      flushSync(() => {
+        setError(err instanceof Error ? err.message : 'Failed to get response');
+        setLoading(false);
+      });
       console.log('=== handleConfirmSend END (error) ===');
-    } finally {
-      setLoading(false);
-      // Force focus back to document
       window.focus();
-      console.log('Final - Document has focus:', document.hasFocus());
     }
   };
 
