@@ -1,9 +1,18 @@
 import { useState } from 'react';
-import { Sparkles, Key, Loader2, AlertCircle, Shield, Eye, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, Key, Loader2, AlertCircle, Shield, Eye, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
-import { getCoachingInsights, getAnonymizationPreview, type CoachingInsight, type AnonymizationPreview } from '../utils/claude';
+import {
+  getCoachingInsights,
+  getAnonymizationPreview,
+  getPlotSummary,
+  getPlotSummaryPreview,
+  type CoachingInsight,
+  type AnonymizationPreview
+} from '../utils/claude';
 import type { Client } from '../types';
 import styles from './CoachingInsights.module.css';
+
+type ActiveFeature = 'questions' | 'plotSummary' | null;
 
 interface CoachingInsightsProps {
   client: Client;
@@ -12,6 +21,8 @@ interface CoachingInsightsProps {
 export function CoachingInsights({ client }: CoachingInsightsProps) {
   const { anthropicApiKey, setAnthropicApiKey } = useApp();
   const [insights, setInsights] = useState<CoachingInsight | null>(null);
+  const [plotSummary, setPlotSummary] = useState<string | null>(null);
+  const [activeFeature, setActiveFeature] = useState<ActiveFeature>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
@@ -24,30 +35,46 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
       await setAnthropicApiKey(apiKeyInput.trim());
       setShowApiKeyInput(false);
       setApiKeyInput('');
+      // After saving key, show preview for the intended feature
+      if (activeFeature) {
+        const previewData = activeFeature === 'plotSummary'
+          ? getPlotSummaryPreview(client)
+          : getAnonymizationPreview(client);
+        setPreview(previewData);
+      }
     }
   };
 
-  const handleShowPreview = () => {
+  const handleShowPreview = (feature: ActiveFeature) => {
     if (!anthropicApiKey) {
+      setActiveFeature(feature);
       setShowApiKeyInput(true);
       return;
     }
-    const previewData = getAnonymizationPreview(client);
+    setActiveFeature(feature);
+    const previewData = feature === 'plotSummary'
+      ? getPlotSummaryPreview(client)
+      : getAnonymizationPreview(client);
     setPreview(previewData);
   };
 
   const handleConfirmSend = async () => {
-    if (!anthropicApiKey || !preview) return;
+    if (!anthropicApiKey || !preview || !activeFeature) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const result = await getCoachingInsights(anthropicApiKey, preview.anonymizedData);
-      setInsights(result);
+      if (activeFeature === 'plotSummary') {
+        const result = await getPlotSummary(anthropicApiKey, preview.anonymizedData);
+        setPlotSummary(result);
+      } else {
+        const result = await getCoachingInsights(anthropicApiKey, preview.anonymizedData);
+        setInsights(result);
+      }
       setPreview(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to get insights');
+      setError(err instanceof Error ? err.message : 'Failed to get response');
     } finally {
       setLoading(false);
     }
@@ -55,6 +82,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
 
   const handleCancel = () => {
     setPreview(null);
+    setActiveFeature(null);
   };
 
   if (showApiKeyInput) {
@@ -154,7 +182,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
       <div className={styles.container}>
         <div className={styles.loading}>
           <Loader2 className={styles.spinner} />
-          <p>Generating coaching questions...</p>
+          <p>{activeFeature === 'plotSummary' ? 'Writing plot summary...' : 'Generating coaching questions...'}</p>
         </div>
       </div>
     );
@@ -166,7 +194,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
         <div className={styles.error}>
           <AlertCircle size={20} />
           <p>{error}</p>
-          <button onClick={handleShowPreview} className="btn-secondary">
+          <button onClick={() => handleShowPreview(activeFeature)} className="btn-secondary">
             Try Again
           </button>
         </div>
@@ -174,53 +202,95 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
     );
   }
 
-  if (insights) {
+  // Show results if we have either insights or plot summary
+  if (insights || plotSummary) {
     return (
       <div className={styles.container}>
-        <div className={styles.header}>
-          <h2>
-            <Sparkles size={20} />
-            Coaching Questions
-          </h2>
-          <button onClick={handleShowPreview} className={styles.refreshBtn}>
-            Refresh
-          </button>
-        </div>
+        {/* Plot Summary Display */}
+        {plotSummary && (
+          <>
+            <div className={styles.header}>
+              <h2>
+                <BookOpen size={20} />
+                Plot Summary
+              </h2>
+              <button onClick={() => handleShowPreview('plotSummary')} className={styles.refreshBtn}>
+                Refresh
+              </button>
+            </div>
+            <div className={styles.plotSummary}>
+              {plotSummary.split('\n\n').map((paragraph, i) => (
+                <p key={i}>{paragraph}</p>
+              ))}
+            </div>
+          </>
+        )}
 
-        <div className={styles.insightSection}>
-          <h3 className={styles.perspectiveTitle}>
-            Diana Chapman
-            <span className={styles.perspectiveSubtitle}>Conscious Leadership</span>
-          </h3>
-          <ul>
-            {insights.dianaChapman.map((q, i) => (
-              <li key={i}>{q}</li>
-            ))}
-          </ul>
-        </div>
+        {/* Coaching Questions Display */}
+        {insights && (
+          <>
+            <div className={styles.header}>
+              <h2>
+                <Sparkles size={20} />
+                Coaching Questions
+              </h2>
+              <button onClick={() => handleShowPreview('questions')} className={styles.refreshBtn}>
+                Refresh
+              </button>
+            </div>
 
-        <div className={styles.insightSection}>
-          <h3 className={styles.perspectiveTitle}>
-            Bruce Tift
-            <span className={styles.perspectiveSubtitle}>Developmental/Relational</span>
-          </h3>
-          <ul>
-            {insights.bruceTift.map((q, i) => (
-              <li key={i}>{q}</li>
-            ))}
-          </ul>
-        </div>
+            <div className={styles.insightSection}>
+              <h3 className={styles.perspectiveTitle}>
+                Diana Chapman
+                <span className={styles.perspectiveSubtitle}>Conscious Leadership</span>
+              </h3>
+              <ul>
+                {insights.dianaChapman.map((q, i) => (
+                  <li key={i}>{q}</li>
+                ))}
+              </ul>
+            </div>
 
-        <div className={styles.insightSection}>
-          <h3 className={styles.perspectiveTitle}>
-            Fritz Perls
-            <span className={styles.perspectiveSubtitle}>Gestalt</span>
-          </h3>
-          <ul>
-            {insights.fritzPerls.map((q, i) => (
-              <li key={i}>{q}</li>
-            ))}
-          </ul>
+            <div className={styles.insightSection}>
+              <h3 className={styles.perspectiveTitle}>
+                Bruce Tift
+                <span className={styles.perspectiveSubtitle}>Developmental/Relational</span>
+              </h3>
+              <ul>
+                {insights.bruceTift.map((q, i) => (
+                  <li key={i}>{q}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className={styles.insightSection}>
+              <h3 className={styles.perspectiveTitle}>
+                Fritz Perls
+                <span className={styles.perspectiveSubtitle}>Gestalt</span>
+              </h3>
+              <ul>
+                {insights.fritzPerls.map((q, i) => (
+                  <li key={i}>{q}</li>
+                ))}
+              </ul>
+            </div>
+          </>
+        )}
+
+        {/* Show button for the other feature if we only have one */}
+        <div className={styles.additionalActions}>
+          {!plotSummary && (
+            <button onClick={() => handleShowPreview('plotSummary')} className={styles.secondaryActionBtn}>
+              <BookOpen size={16} />
+              Get Plot Summary
+            </button>
+          )}
+          {!insights && (
+            <button onClick={() => handleShowPreview('questions')} className={styles.secondaryActionBtn}>
+              <Sparkles size={16} />
+              Get Coaching Questions
+            </button>
+          )}
         </div>
       </div>
     );
@@ -228,13 +298,18 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
 
   return (
     <div className={styles.container}>
-      <button onClick={handleShowPreview} className={styles.getInsightsBtn}>
-        <Sparkles size={18} />
-        Get Coaching Questions
-      </button>
+      <div className={styles.buttonGroup}>
+        <button onClick={() => handleShowPreview('questions')} className={styles.getInsightsBtn}>
+          <Sparkles size={18} />
+          Coaching Questions
+        </button>
+        <button onClick={() => handleShowPreview('plotSummary')} className={styles.getInsightsBtn}>
+          <BookOpen size={18} />
+          Plot Summary
+        </button>
+      </div>
       <p className={styles.description}>
-        AI-generated questions from Diana Chapman, Bruce Tift, and Fritz Perls perspectives.
-        Data is anonymized before sending.
+        AI-powered features. Data is anonymized before sending.
       </p>
     </div>
   );

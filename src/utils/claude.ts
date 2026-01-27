@@ -21,7 +21,7 @@ function buildPrompt(data: AnonymizedClientData): string {
     .join('\n\n');
 
   const enneagramInfo = data.enneagramType !== '?'
-    ? `Enneagram: Type ${data.enneagramType}${data.enneagramWing ? `w${data.enneagramWing}` : ''}`
+    ? `Enneagram: Type ${data.enneagramType}${data.enneagramSecondary ? `/${data.enneagramSecondary}` : ''}`
     : '';
 
   return `You are helping a coach by generating powerful questions from three distinct therapeutic perspectives. Review the anonymized client notes below and generate questions the coach could ask.
@@ -154,4 +154,77 @@ export async function getCoachingInsights(
   } catch {
     throw new Error('Failed to parse Claude response');
   }
+}
+
+// Build prompt for plot summary
+function buildPlotSummaryPrompt(data: AnonymizedClientData): string {
+  const sessionNotesText = data.sessionNotes
+    .sort((a, b) => a.sessionNumber - b.sessionNumber)
+    .map(s => `Session ${s.sessionNumber}:\n${s.notes || '(no notes)'}`)
+    .join('\n\n');
+
+  return `You are a minimalist writer in the style of Raymond Carver. Your task is to write a brief, understated summary of this coaching engagement as if it were the arc of a short story.
+
+Write in third person. Use simple, declarative sentences. No judgments, no analysis, no advice. Just the facts of what happened, what was explored, what shifted. Like Carver, find the quiet drama in ordinary moments.
+
+Keep it to 3-5 short paragraphs. No more than 150 words total.
+
+Here is the material:
+
+Sessions completed: ${data.sessionsCompleted}
+
+OVERALL NOTES:
+${data.overallNotes || '(none)'}
+
+SESSION NOTES:
+${sessionNotesText || '(no session notes yet)'}
+
+---
+
+Write the plot summary now. Remember: minimal, factual, Carver-esque. No platitudes, no coaching language, no emotional interpretations. Just what happened.`;
+}
+
+export function getPlotSummaryPreview(client: Client): AnonymizationPreview {
+  const anonymizedData = anonymizeClientData(client);
+  const promptPreview = buildPlotSummaryPrompt(anonymizedData);
+  return { anonymizedData, promptPreview };
+}
+
+export async function getPlotSummary(
+  apiKey: string,
+  anonymizedData: AnonymizedClientData
+): Promise<string> {
+  const response = await fetch(ANTHROPIC_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      messages: [
+        {
+          role: 'user',
+          content: buildPlotSummaryPrompt(anonymizedData),
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error?.message || `API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const content = data.content?.[0]?.text;
+
+  if (!content) {
+    throw new Error('No response from Claude');
+  }
+
+  return content.trim();
 }
