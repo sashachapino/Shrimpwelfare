@@ -160,10 +160,10 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
             className={styles.apiKeyInput}
           />
           <div className={styles.apiKeyActions}>
-            <button onClick={handleSaveApiKey} className="btn-accent" disabled={!apiKeyInput.trim()}>
+            <button type="button" onClick={handleSaveApiKey} className="btn-accent" disabled={!apiKeyInput.trim()}>
               Save Key
             </button>
-            <button onClick={() => setShowApiKeyInput(false)} className="btn-ghost">
+            <button type="button" onClick={() => setShowApiKeyInput(false)} className="btn-ghost">
               Cancel
             </button>
           </div>
@@ -211,6 +211,7 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
 
           <div className={styles.previewToggle}>
             <button
+              type="button"
               onClick={() => setShowFullPreview(!showFullPreview)}
               className={styles.toggleBtn}
             >
@@ -227,10 +228,10 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
           )}
 
           <div className={styles.previewActions}>
-            <button onClick={handleConfirmSend} className="btn-accent">
+            <button type="button" onClick={handleConfirmSend} className="btn-accent">
               Confirm & Send
             </button>
-            <button onClick={handleCancel} className="btn-ghost">
+            <button type="button" onClick={handleCancel} className="btn-ghost">
               Cancel
             </button>
           </div>
@@ -256,7 +257,7 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
         <div className={styles.error}>
           <AlertCircle size={20} />
           <p>{error}</p>
-          <button onClick={() => handleShowPreview(activeFeature)} className="btn-secondary">
+          <button type="button" onClick={() => handleShowPreview(activeFeature)} className="btn-secondary">
             Try Again
           </button>
         </div>
@@ -281,7 +282,7 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
                 <BookOpen size={20} />
                 Plot Summary
               </h2>
-              <button onClick={() => handleShowPreview('plotSummary')} className={styles.refreshBtn}>
+              <button type="button" onClick={() => handleShowPreview('plotSummary')} className={styles.refreshBtn}>
                 Refresh
               </button>
             </div>
@@ -301,7 +302,7 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
                 <Sparkles size={20} />
                 Coaching Questions
               </h2>
-              <button onClick={() => handleShowPreview('questions')} className={styles.refreshBtn}>
+              <button type="button" onClick={() => handleShowPreview('questions')} className={styles.refreshBtn}>
                 Refresh
               </button>
             </div>
@@ -347,13 +348,13 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
         {/* Show button for the other feature if we only have one */}
         <div className={styles.additionalActions}>
           {!plotSummary && (
-            <button onClick={() => handleShowPreview('plotSummary')} className={styles.secondaryActionBtn}>
+            <button type="button" onClick={() => handleShowPreview('plotSummary')} className={styles.secondaryActionBtn}>
               <BookOpen size={16} />
               Get Plot Summary
             </button>
           )}
           {!insights && (
-            <button onClick={() => handleShowPreview('questions')} className={styles.secondaryActionBtn}>
+            <button type="button" onClick={() => handleShowPreview('questions')} className={styles.secondaryActionBtn}>
               <Sparkles size={16} />
               Get Coaching Questions
             </button>
@@ -366,11 +367,11 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
   return (
     <div className={styles.container}>
       <div className={styles.buttonGroup}>
-        <button onClick={() => handleShowPreview('questions')} className={styles.getInsightsBtn}>
+        <button type="button" onClick={() => handleShowPreview('questions')} className={styles.getInsightsBtn}>
           <Sparkles size={18} />
           Coaching Questions
         </button>
-        <button onClick={() => handleShowPreview('plotSummary')} className={styles.getInsightsBtn}>
+        <button type="button" onClick={() => handleShowPreview('plotSummary')} className={styles.getInsightsBtn}>
           <BookOpen size={18} />
           Plot Summary
         </button>
