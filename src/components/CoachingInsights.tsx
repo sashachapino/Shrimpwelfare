@@ -1,4 +1,5 @@
-import { useState, Component, type ReactNode } from 'react';
+import { useState, useCallback, Component, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { Sparkles, Key, Loader2, AlertCircle, Shield, Eye, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import {
@@ -101,23 +102,39 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
     }
   };
 
-  const handleShowPreview = (feature: ActiveFeature) => {
+  const handleShowPreview = useCallback((feature: ActiveFeature) => {
+    console.log('handleShowPreview called with:', feature, 'apiKey exists:', !!anthropicApiKey);
+
     if (!anthropicApiKey) {
-      setActiveFeature(feature);
-      setShowApiKeyInput(true);
+      flushSync(() => {
+        setActiveFeature(feature);
+        setShowApiKeyInput(true);
+      });
       return;
     }
-    setActiveFeature(feature);
-    setError(null);
+
     try {
       const previewData = feature === 'plotSummary'
         ? getPlotSummaryPreview(client)
         : getAnonymizationPreview(client);
-      setPreview(previewData);
+
+      console.log('Preview data generated:', !!previewData);
+
+      // Force synchronous state updates
+      flushSync(() => {
+        setActiveFeature(feature);
+        setError(null);
+        setPreview(previewData);
+      });
+
+      console.log('State updated, preview should now be visible');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate preview');
+      console.error('Error generating preview:', err);
+      flushSync(() => {
+        setError(err instanceof Error ? err.message : 'Failed to generate preview');
+      });
     }
-  };
+  }, [anthropicApiKey, client]);
 
   const handleConfirmSend = async () => {
     if (!anthropicApiKey || !preview || !activeFeature) return;
@@ -391,8 +408,23 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
     );
   }
 
+  // Debug: log render state
+  console.log('Render state:', {
+    showApiKeyInput,
+    hasPreview: !!preview,
+    loading,
+    hasError: !!error,
+    hasInsights: !!insights,
+    hasPlotSummary: !!plotSummary,
+    activeFeature
+  });
+
   return (
     <div className={styles.container}>
+      {/* Debug display - remove after fixing */}
+      <div style={{ fontSize: '10px', color: '#999', marginBottom: '8px' }}>
+        Debug: preview={preview ? 'YES' : 'NO'}, apiKey={anthropicApiKey ? 'YES' : 'NO'}, active={activeFeature || 'none'}
+      </div>
       <div className={styles.buttonGroup}>
         <button type="button" onClick={() => handleShowPreview('questions')} className={styles.getInsightsBtn}>
           <Sparkles size={18} />
