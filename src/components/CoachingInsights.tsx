@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
-import { flushSync } from 'react-dom';
+import { useReducer, useState } from 'react';
 import { Sparkles, Key, Loader2, AlertCircle, Shield, Eye, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import {
@@ -8,355 +7,179 @@ import {
   getPlotSummary,
   getPlotSummaryPreview,
   type CoachingInsight,
-  type AnonymizationPreview
+  type AnonymizedClientData
 } from '../utils/claude';
 import type { Client } from '../types';
 import styles from './CoachingInsights.module.css';
 
-type ActiveFeature = 'questions' | 'plotSummary' | null;
+// Simple state machine with useReducer
+type FeatureType = 'questions' | 'plotSummary';
+
+type State =
+  | { status: 'idle' }
+  | { status: 'needsApiKey'; feature: FeatureType }
+  | { status: 'preview'; feature: FeatureType; anonymizedData: AnonymizedClientData; promptPreview: string }
+  | { status: 'loading'; feature: FeatureType; anonymizedData: AnonymizedClientData }
+  | { status: 'error'; message: string; feature: FeatureType }
+  | { status: 'success'; insights: CoachingInsight | null; plotSummary: string | null };
+
+type Action =
+  | { type: 'START_FEATURE'; feature: FeatureType; hasApiKey: boolean; anonymizedData: AnonymizedClientData; promptPreview: string }
+  | { type: 'API_KEY_SAVED'; anonymizedData: AnonymizedClientData; promptPreview: string }
+  | { type: 'CONFIRM_SEND' }
+  | { type: 'CANCEL' }
+  | { type: 'SUCCESS'; insights?: CoachingInsight; plotSummary?: string }
+  | { type: 'ERROR'; message: string }
+  | { type: 'RESET' };
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case 'START_FEATURE':
+      if (!action.hasApiKey) {
+        return { status: 'needsApiKey', feature: action.feature };
+      }
+      return {
+        status: 'preview',
+        feature: action.feature,
+        anonymizedData: action.anonymizedData,
+        promptPreview: action.promptPreview
+      };
+
+    case 'API_KEY_SAVED':
+      if (state.status !== 'needsApiKey') return state;
+      return {
+        status: 'preview',
+        feature: state.feature,
+        anonymizedData: action.anonymizedData,
+        promptPreview: action.promptPreview
+      };
+
+    case 'CONFIRM_SEND':
+      if (state.status !== 'preview') return state;
+      return {
+        status: 'loading',
+        feature: state.feature,
+        anonymizedData: state.anonymizedData
+      };
+
+    case 'CANCEL':
+      return { status: 'idle' };
+
+    case 'SUCCESS':
+      // Merge with existing results if any
+      const prevInsights = state.status === 'success' ? state.insights : null;
+      const prevPlotSummary = state.status === 'success' ? state.plotSummary : null;
+      return {
+        status: 'success',
+        insights: action.insights ?? prevInsights,
+        plotSummary: action.plotSummary ?? prevPlotSummary
+      };
+
+    case 'ERROR':
+      if (state.status !== 'loading') return state;
+      return { status: 'error', message: action.message, feature: state.feature };
+
+    case 'RESET':
+      return { status: 'idle' };
+
+    default:
+      return state;
+  }
+}
 
 interface CoachingInsightsProps {
   client: Client;
 }
 
-// Single component - removed error boundary to simplify debugging
 export function CoachingInsights({ client }: CoachingInsightsProps) {
   const { anthropicApiKey, setAnthropicApiKey } = useApp();
-  const [insights, setInsights] = useState<CoachingInsight | null>(null);
-  const [plotSummary, setPlotSummary] = useState<string | null>(null);
-  const [activeFeature, setActiveFeature] = useState<ActiveFeature>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [preview, setPreview] = useState<AnonymizationPreview | null>(null);
-  const [showFullPreview, setShowFullPreview] = useState(false);
-  const [renderKey] = useState(0); // For keying elements
+  const [state, dispatch] = useReducer(reducer, { status: 'idle' });
 
-  // Use refs to avoid stale closure issues in async handlers
-  const previewRef = useRef(preview);
-  const activeFeatureRef = useRef(activeFeature);
-  const apiKeyRef = useRef(anthropicApiKey);
+  // Start a feature (questions or plot summary)
+  const handleStartFeature = (feature: FeatureType) => {
+    const preview = feature === 'plotSummary'
+      ? getPlotSummaryPreview(client)
+      : getAnonymizationPreview(client);
 
-  useEffect(() => {
-    previewRef.current = preview;
-    activeFeatureRef.current = activeFeature;
-    apiKeyRef.current = anthropicApiKey;
-  }, [preview, activeFeature, anthropicApiKey]);
+    dispatch({
+      type: 'START_FEATURE',
+      feature,
+      hasApiKey: !!anthropicApiKey,
+      anonymizedData: preview.anonymizedData,
+      promptPreview: preview.promptPreview
+    });
+  };
 
-  // Debug: Track focus changes
-  useEffect(() => {
-    const onFocus = () => console.log('>>> Window GAINED focus');
-    const onBlur = () => console.log('>>> Window LOST focus');
-    const onVisChange = () => console.log('>>> Visibility changed:', document.visibilityState);
+  // Save API key and proceed to preview
+  const handleSaveApiKey = async (key: string) => {
+    if (!key.trim()) return;
+    await setAnthropicApiKey(key.trim());
 
-    window.addEventListener('focus', onFocus);
-    window.addEventListener('blur', onBlur);
-    document.addEventListener('visibilitychange', onVisChange);
-
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      window.removeEventListener('blur', onBlur);
-      document.removeEventListener('visibilitychange', onVisChange);
-    };
-  }, []);
-
-  // Direct function - no useCallback to avoid stale closure issues
-  const handleShowPreview = (feature: ActiveFeature) => {
-    console.log('=== handleShowPreview START ===');
-    console.log('Feature:', feature);
-    console.log('Has API key:', !!anthropicApiKey);
-    console.log('Client:', client?.name);
-
-    if (!anthropicApiKey) {
-      console.log('No API key - showing input');
-      setActiveFeature(feature);
-      setShowApiKeyInput(true);
-      console.log('State updated for API key input');
-      return;
-    }
-
-    try {
-      console.log('Generating preview data...');
-      const previewData = feature === 'plotSummary'
+    if (state.status === 'needsApiKey') {
+      const preview = state.feature === 'plotSummary'
         ? getPlotSummaryPreview(client)
         : getAnonymizationPreview(client);
-
-      console.log('Preview data generated successfully');
-
-      setActiveFeature(feature);
-      setError(null);
-      setPreview(previewData);
-
-      // Force browser repaint
-      requestAnimationFrame(() => {
-        document.body.offsetHeight;
+      dispatch({
+        type: 'API_KEY_SAVED',
+        anonymizedData: preview.anonymizedData,
+        promptPreview: preview.promptPreview
       });
-
-      console.log('=== handleShowPreview END (success) ===');
-    } catch (err) {
-      console.error('Error in handleShowPreview:', err);
-      setError(err instanceof Error ? err.message : 'Failed to generate preview');
-      console.log('=== handleShowPreview END (error) ===');
     }
   };
 
-  const handleSaveApiKey = async () => {
-    if (apiKeyInput.trim()) {
-      await setAnthropicApiKey(apiKeyInput.trim());
-      setShowApiKeyInput(false);
-      setApiKeyInput('');
-      // After saving key, show preview for the intended feature
-      if (activeFeature) {
-        try {
-          const previewData = activeFeature === 'plotSummary'
-            ? getPlotSummaryPreview(client)
-            : getAnonymizationPreview(client);
-          setPreview(previewData);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'Failed to generate preview');
-        }
-      }
-    }
-  };
-
+  // Confirm and send to API
   const handleConfirmSend = async () => {
-    console.log('=== handleConfirmSend START ===');
-    console.log('Active element before:', document.activeElement?.tagName, document.activeElement?.className);
-    console.log('Document has focus:', document.hasFocus());
+    if (state.status !== 'preview' || !anthropicApiKey) return;
 
-    // Use refs to get current values (avoid stale closures)
-    const currentApiKey = apiKeyRef.current;
-    const currentPreview = previewRef.current;
-    const currentFeature = activeFeatureRef.current;
-
-    console.log('anthropicApiKey (ref):', !!currentApiKey);
-    console.log('preview (ref):', !!currentPreview);
-    console.log('activeFeature (ref):', currentFeature);
-
-    if (!currentApiKey || !currentPreview || !currentFeature) {
-      console.log('EARLY RETURN - missing:', {
-        apiKey: !currentApiKey,
-        preview: !currentPreview,
-        activeFeature: !currentFeature
-      });
-      return;
-    }
-
-    console.log('Setting loading state with flushSync...');
-
-    // Force synchronous render of loading state
-    flushSync(() => {
-      setLoading(true);
-      setError(null);
-    });
-
-    console.log('After flushSync - loading should now be rendered');
-    console.log('Document has focus:', document.hasFocus());
-
-    // Double-check by reading DOM
-    const loadingBanner = document.querySelector('[style*="orange"]');
-    console.log('Loading banner in DOM:', !!loadingBanner);
+    dispatch({ type: 'CONFIRM_SEND' });
 
     try {
-      console.log('Making API call for:', currentFeature);
-
-      let result;
-      if (currentFeature === 'plotSummary') {
-        result = await getPlotSummary(currentApiKey, currentPreview.anonymizedData);
-        console.log('Got plot summary result');
-        setPlotSummary(result);
+      if (state.feature === 'plotSummary') {
+        const result = await getPlotSummary(anthropicApiKey, state.anonymizedData);
+        dispatch({ type: 'SUCCESS', plotSummary: result });
       } else {
-        result = await getCoachingInsights(currentApiKey, currentPreview.anonymizedData);
-        console.log('Got coaching insights result');
-        setInsights(result);
+        const result = await getCoachingInsights(anthropicApiKey, state.anonymizedData);
+        dispatch({ type: 'SUCCESS', insights: result });
       }
-
-      console.log('After API call - Document has focus:', document.hasFocus());
-
-      // Force synchronous render of results
-      flushSync(() => {
-        setPreview(null);
-        setLoading(false);
-      });
-
-      console.log('=== handleConfirmSend END (success) ===');
-      window.focus();
     } catch (err) {
-      console.error('API call error:', err);
-      flushSync(() => {
-        setError(err instanceof Error ? err.message : 'Failed to get response');
-        setLoading(false);
-      });
-      console.log('=== handleConfirmSend END (error) ===');
-      window.focus();
+      dispatch({ type: 'ERROR', message: err instanceof Error ? err.message : 'Request failed' });
     }
   };
 
-  const handleCancel = () => {
-    setPreview(null);
-    setActiveFeature(null);
-  };
+  // Render based on current state
+  if (state.status === 'needsApiKey') {
+    return <ApiKeyInput onSave={handleSaveApiKey} onCancel={() => dispatch({ type: 'CANCEL' })} />;
+  }
 
-  // Log current state on every render
-  console.log('CoachingInsights RENDER:', {
-    showApiKeyInput,
-    hasPreview: !!preview,
-    loading,
-    hasError: !!error,
-    hasInsights: !!insights,
-    hasPlotSummary: !!plotSummary,
-    activeFeature,
-    hasApiKey: !!anthropicApiKey
-  });
-
-  if (showApiKeyInput) {
-    console.log('>>> Rendering: API KEY INPUT state');
+  if (state.status === 'preview') {
     return (
-      <div className={styles.container} style={{ border: '3px solid blue' }}>
-        <div style={{ background: 'blue', color: 'white', padding: '4px 8px', marginBottom: '8px', fontSize: '12px' }}>
-          STATE: API KEY INPUT
-        </div>
-        <div className={styles.apiKeyPrompt}>
-          <Key className={styles.keyIcon} />
-          <h3>Connect Claude</h3>
-          <p>Enter your Anthropic API key to enable AI-powered coaching questions</p>
-          <input
-            type="password"
-            value={apiKeyInput}
-            onChange={(e) => setApiKeyInput(e.target.value)}
-            placeholder="sk-ant-..."
-            className={styles.apiKeyInput}
-          />
-          <div className={styles.apiKeyActions}>
-            <button type="button" onClick={handleSaveApiKey} className="btn-accent" disabled={!apiKeyInput.trim()}>
-              Save Key
-            </button>
-            <button type="button" onClick={() => setShowApiKeyInput(false)} className="btn-ghost">
-              Cancel
-            </button>
-          </div>
-          <p className={styles.hint}>
-            Get your API key at <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>
-          </p>
-        </div>
-      </div>
+      <PreviewScreen
+        anonymizedData={state.anonymizedData}
+        promptPreview={state.promptPreview}
+        onConfirm={handleConfirmSend}
+        onCancel={() => dispatch({ type: 'CANCEL' })}
+      />
     );
   }
 
-  if (preview) {
-    console.log('>>> Rendering: PREVIEW state');
-    const replacements = preview.anonymizedData?.allReplacements ?? [];
-
+  if (state.status === 'loading') {
     return (
-      <div className={styles.container} style={{ border: '3px solid green' }}>
-        <div style={{ background: 'green', color: 'white', padding: '4px 8px', marginBottom: '8px', fontSize: '12px' }}>
-          STATE: PREVIEW (has anonymized data ready to send)
-        </div>
-        <div className={styles.previewSection}>
-          <div className={styles.previewHeader}>
-            <Shield size={20} />
-            <h3>Review Anonymized Data</h3>
-          </div>
-
-          <div className={styles.previewWarning}>
-            <p>
-              <strong>Before sending:</strong> Review the anonymized data below.
-              Confirm no identifying information remains.
-            </p>
-            <p className={styles.retentionNote}>
-              <strong>Data retention:</strong> Anthropic may retain API data for up to 30 days
-              for safety monitoring. They do not use API data for training.
-              {' '}<a href="https://support.anthropic.com/en/articles/7996866-how-long-do-you-store-personal-data" target="_blank" rel="noopener noreferrer">Learn more</a>
-            </p>
-          </div>
-
-          {replacements.length > 0 && (
-            <div className={styles.replacementsList}>
-              <h4>Automatic replacements made:</h4>
-              <ul>
-                {replacements.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className={styles.previewToggle}>
-            <button
-              type="button"
-              onClick={() => setShowFullPreview(!showFullPreview)}
-              className={styles.toggleBtn}
-            >
-              <Eye size={16} />
-              {showFullPreview ? 'Hide' : 'Show'} full prompt
-              {showFullPreview ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            </button>
-          </div>
-
-          {showFullPreview && (
-            <div className={styles.fullPreview}>
-              <pre>{preview.promptPreview ?? ''}</pre>
-            </div>
-          )}
-
-          <div className={styles.previewActions}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('Confirm & Send button clicked!');
-                handleConfirmSend();
-              }}
-              className="btn-accent"
-            >
-              Confirm & Send
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('Cancel button clicked!');
-                handleCancel();
-              }}
-              className="btn-ghost"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    console.log('>>> Rendering: LOADING state');
-    return (
-      <div key={`loading-${renderKey}`} className={styles.container} style={{ border: '3px solid orange' }}>
-        <div style={{ background: 'orange', color: 'white', padding: '4px 8px', marginBottom: '8px', fontSize: '12px' }}>
-          STATE: LOADING (sending to Claude API)
-        </div>
+      <div className={styles.container}>
         <div className={styles.loading}>
           <Loader2 className={styles.spinner} />
-          <p>{activeFeature === 'plotSummary' ? 'Writing plot summary...' : 'Generating coaching questions...'}</p>
+          <p>{state.feature === 'plotSummary' ? 'Writing plot summary...' : 'Generating coaching questions...'}</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
-    console.log('>>> Rendering: ERROR state');
+  if (state.status === 'error') {
     return (
-      <div className={styles.container} style={{ border: '3px solid red' }}>
-        <div style={{ background: 'red', color: 'white', padding: '4px 8px', marginBottom: '8px', fontSize: '12px' }}>
-          STATE: ERROR
-        </div>
+      <div className={styles.container}>
         <div className={styles.error}>
           <AlertCircle size={20} />
-          <p>{error}</p>
-          <button type="button" onClick={() => handleShowPreview(activeFeature)} className="btn-secondary">
+          <p>{state.message}</p>
+          <button type="button" onClick={() => handleStartFeature(state.feature)} className="btn-secondary">
             Try Again
           </button>
         </div>
@@ -364,167 +187,25 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
     );
   }
 
-  // Show results if we have either insights or plot summary
-  if (insights || plotSummary) {
-    console.log('>>> Rendering: RESULTS state');
-    const defaultPerspective = { vitalMatter: '', questions: [] };
-    const diana = insights?.dianaChapman ?? defaultPerspective;
-    const bruce = insights?.bruceTift ?? defaultPerspective;
-    const jonathan = insights?.jonathanShedler ?? defaultPerspective;
-    const genpo = insights?.genpoRoshi ?? defaultPerspective;
-    const summaryParagraphs = typeof plotSummary === 'string' ? plotSummary.split('\n\n') : [];
-
+  if (state.status === 'success') {
     return (
-      <div className={styles.container} style={{ border: '3px solid purple' }}>
-        <div style={{ background: 'purple', color: 'white', padding: '4px 8px', marginBottom: '8px', fontSize: '12px' }}>
-          STATE: RESULTS (showing AI responses)
-        </div>
-        {/* Plot Summary Display */}
-        {plotSummary && (
-          <>
-            <div className={styles.header}>
-              <h2>
-                <BookOpen size={20} />
-                Plot Summary
-              </h2>
-              <button type="button" onClick={() => handleShowPreview('plotSummary')} className={styles.refreshBtn}>
-                Refresh
-              </button>
-            </div>
-            <div className={styles.plotSummary}>
-              {summaryParagraphs.map((paragraph, i) => (
-                <p key={i}>{paragraph}</p>
-              ))}
-            </div>
-          </>
-        )}
-
-        {/* Coaching Insights Display */}
-        {insights && (
-          <>
-            <div className={styles.header}>
-              <h2>
-                <Sparkles size={20} />
-                Coaching Insights
-              </h2>
-              <button type="button" onClick={() => handleShowPreview('questions')} className={styles.refreshBtn}>
-                Refresh
-              </button>
-            </div>
-
-            <div className={styles.insightSection}>
-              <h3 className={styles.perspectiveTitle}>
-                Diana Chapman
-                <span className={styles.perspectiveSubtitle}>Conscious Leadership</span>
-              </h3>
-              {diana.vitalMatter && (
-                <p className={styles.vitalMatter}>{diana.vitalMatter}</p>
-              )}
-              <ul>
-                {(diana.questions ?? []).map((q, i) => (
-                  <li key={i}>{q}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className={styles.insightSection}>
-              <h3 className={styles.perspectiveTitle}>
-                Bruce Tift
-                <span className={styles.perspectiveSubtitle}>Developmental/Relational</span>
-              </h3>
-              {bruce.vitalMatter && (
-                <p className={styles.vitalMatter}>{bruce.vitalMatter}</p>
-              )}
-              <ul>
-                {(bruce.questions ?? []).map((q, i) => (
-                  <li key={i}>{q}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className={styles.insightSection}>
-              <h3 className={styles.perspectiveTitle}>
-                Jonathan Shedler
-                <span className={styles.perspectiveSubtitle}>Psychodynamic</span>
-              </h3>
-              {jonathan.vitalMatter && (
-                <p className={styles.vitalMatter}>{jonathan.vitalMatter}</p>
-              )}
-              <ul>
-                {(jonathan.questions ?? []).map((q, i) => (
-                  <li key={i}>{q}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className={styles.insightSection}>
-              <h3 className={styles.perspectiveTitle}>
-                Genpo Roshi
-                <span className={styles.perspectiveSubtitle}>Big Mind Process</span>
-              </h3>
-              {genpo.vitalMatter && (
-                <p className={styles.vitalMatter}>{genpo.vitalMatter}</p>
-              )}
-              <ul>
-                {(genpo.questions ?? []).map((q, i) => (
-                  <li key={i}>{q}</li>
-                ))}
-              </ul>
-            </div>
-          </>
-        )}
-
-        {/* Show button for the other feature if we only have one */}
-        <div className={styles.additionalActions}>
-          {!plotSummary && (
-            <button type="button" onClick={() => handleShowPreview('plotSummary')} className={styles.secondaryActionBtn}>
-              <BookOpen size={16} />
-              Get Plot Summary
-            </button>
-          )}
-          {!insights && (
-            <button type="button" onClick={() => handleShowPreview('questions')} className={styles.secondaryActionBtn}>
-              <Sparkles size={16} />
-              Get Coaching Questions
-            </button>
-          )}
-        </div>
-      </div>
+      <ResultsScreen
+        insights={state.insights}
+        plotSummary={state.plotSummary}
+        onRefresh={handleStartFeature}
+      />
     );
   }
 
-  // Default state - show buttons
-  console.log('>>> Rendering: INITIAL/BUTTONS state');
-
+  // Idle state - show buttons
   return (
-    <div className={styles.container} style={{ border: '3px solid #7c3aed' }}>
-      <div style={{ background: '#7c3aed', color: 'white', padding: '4px 8px', marginBottom: '8px', fontSize: '12px' }}>
-        STATE: INITIAL (click a button to start)
-      </div>
+    <div className={styles.container}>
       <div className={styles.buttonGroup}>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Button clicked! Calling handleShowPreview...');
-            handleShowPreview('questions');
-          }}
-          className={styles.getInsightsBtn}
-        >
+        <button type="button" onClick={() => handleStartFeature('questions')} className={styles.getInsightsBtn}>
           <Sparkles size={18} />
           Coaching Questions
         </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Button clicked! Calling handleShowPreview...');
-            handleShowPreview('plotSummary');
-          }}
-          className={styles.getInsightsBtn}
-        >
+        <button type="button" onClick={() => handleStartFeature('plotSummary')} className={styles.getInsightsBtn}>
           <BookOpen size={18} />
           Plot Summary
         </button>
@@ -532,6 +213,213 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
       <p className={styles.description}>
         AI-powered features. Data is anonymized before sending.
       </p>
+    </div>
+  );
+}
+
+// Sub-components for cleaner organization
+
+function ApiKeyInput({ onSave, onCancel }: { onSave: (key: string) => void; onCancel: () => void }) {
+  const [key, setKey] = useState('');
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.apiKeyPrompt}>
+        <Key className={styles.keyIcon} />
+        <h3>Connect Claude</h3>
+        <p>Enter your Anthropic API key to enable AI-powered coaching questions</p>
+        <input
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder="sk-ant-..."
+          className={styles.apiKeyInput}
+        />
+        <div className={styles.apiKeyActions}>
+          <button type="button" onClick={() => onSave(key)} className="btn-accent" disabled={!key.trim()}>
+            Save Key
+          </button>
+          <button type="button" onClick={onCancel} className="btn-ghost">
+            Cancel
+          </button>
+        </div>
+        <p className={styles.hint}>
+          Get your API key at <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PreviewScreen({
+  anonymizedData,
+  promptPreview,
+  onConfirm,
+  onCancel
+}: {
+  anonymizedData: AnonymizedClientData;
+  promptPreview: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const [showFull, setShowFull] = useState(false);
+  const replacements: string[] = anonymizedData.allReplacements ?? [];
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.previewSection}>
+        <div className={styles.previewHeader}>
+          <Shield size={20} />
+          <h3>Review Anonymized Data</h3>
+        </div>
+
+        <div className={styles.previewWarning}>
+          <p>
+            <strong>Before sending:</strong> Review the anonymized data below.
+            Confirm no identifying information remains.
+          </p>
+          <p className={styles.retentionNote}>
+            <strong>Data retention:</strong> Anthropic may retain API data for up to 30 days
+            for safety monitoring. They do not use API data for training.
+            {' '}<a href="https://support.anthropic.com/en/articles/7996866-how-long-do-you-store-personal-data" target="_blank" rel="noopener noreferrer">Learn more</a>
+          </p>
+        </div>
+
+        {replacements.length > 0 && (
+          <div className={styles.replacementsList}>
+            <h4>Automatic replacements made:</h4>
+            <ul>
+              {replacements.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className={styles.previewToggle}>
+          <button type="button" onClick={() => setShowFull(!showFull)} className={styles.toggleBtn}>
+            <Eye size={16} />
+            {showFull ? 'Hide' : 'Show'} full prompt
+            {showFull ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+        </div>
+
+        {showFull && (
+          <div className={styles.fullPreview}>
+            <pre>{promptPreview}</pre>
+          </div>
+        )}
+
+        <div className={styles.previewActions}>
+          <button type="button" onClick={onConfirm} className="btn-accent">
+            Confirm & Send
+          </button>
+          <button type="button" onClick={onCancel} className="btn-ghost">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResultsScreen({
+  insights,
+  plotSummary,
+  onRefresh
+}: {
+  insights: CoachingInsight | null;
+  plotSummary: string | null;
+  onRefresh: (feature: FeatureType) => void;
+}) {
+  const defaultPerspective = { vitalMatter: '', questions: [] };
+  const diana = insights?.dianaChapman ?? defaultPerspective;
+  const bruce = insights?.bruceTift ?? defaultPerspective;
+  const jonathan = insights?.jonathanShedler ?? defaultPerspective;
+  const genpo = insights?.genpoRoshi ?? defaultPerspective;
+  const summaryParagraphs = plotSummary?.split('\n\n') ?? [];
+
+  return (
+    <div className={styles.container}>
+      {plotSummary && (
+        <>
+          <div className={styles.header}>
+            <h2>
+              <BookOpen size={20} />
+              Plot Summary
+            </h2>
+            <button type="button" onClick={() => onRefresh('plotSummary')} className={styles.refreshBtn}>
+              Refresh
+            </button>
+          </div>
+          <div className={styles.plotSummary}>
+            {summaryParagraphs.map((p, i) => (
+              <p key={i}>{p}</p>
+            ))}
+          </div>
+        </>
+      )}
+
+      {insights && (
+        <>
+          <div className={styles.header}>
+            <h2>
+              <Sparkles size={20} />
+              Coaching Insights
+            </h2>
+            <button type="button" onClick={() => onRefresh('questions')} className={styles.refreshBtn}>
+              Refresh
+            </button>
+          </div>
+
+          <PerspectiveSection name="Diana Chapman" subtitle="Conscious Leadership" data={diana} />
+          <PerspectiveSection name="Bruce Tift" subtitle="Developmental/Relational" data={bruce} />
+          <PerspectiveSection name="Jonathan Shedler" subtitle="Psychodynamic" data={jonathan} />
+          <PerspectiveSection name="Genpo Roshi" subtitle="Big Mind Process" data={genpo} />
+        </>
+      )}
+
+      <div className={styles.additionalActions}>
+        {!plotSummary && (
+          <button type="button" onClick={() => onRefresh('plotSummary')} className={styles.secondaryActionBtn}>
+            <BookOpen size={16} />
+            Get Plot Summary
+          </button>
+        )}
+        {!insights && (
+          <button type="button" onClick={() => onRefresh('questions')} className={styles.secondaryActionBtn}>
+            <Sparkles size={16} />
+            Get Coaching Questions
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PerspectiveSection({
+  name,
+  subtitle,
+  data
+}: {
+  name: string;
+  subtitle: string;
+  data: { vitalMatter: string; questions: string[] };
+}) {
+  return (
+    <div className={styles.insightSection}>
+      <h3 className={styles.perspectiveTitle}>
+        {name}
+        <span className={styles.perspectiveSubtitle}>{subtitle}</span>
+      </h3>
+      {data.vitalMatter && (
+        <p className={styles.vitalMatter}>{data.vitalMatter}</p>
+      )}
+      <ul>
+        {data.questions.map((q, i) => (
+          <li key={i}>{q}</li>
+        ))}
+      </ul>
     </div>
   );
 }
