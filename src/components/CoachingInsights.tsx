@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Sparkles, Key, Loader2, AlertCircle, Shield, Eye, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import {
@@ -30,6 +30,18 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [preview, setPreview] = useState<AnonymizationPreview | null>(null);
   const [showFullPreview, setShowFullPreview] = useState(false);
+  const [renderKey, setRenderKey] = useState(0); // Force re-render mechanism
+
+  // Use refs to avoid stale closure issues in async handlers
+  const previewRef = useRef(preview);
+  const activeFeatureRef = useRef(activeFeature);
+  const apiKeyRef = useRef(anthropicApiKey);
+
+  useEffect(() => {
+    previewRef.current = preview;
+    activeFeatureRef.current = activeFeature;
+    apiKeyRef.current = anthropicApiKey;
+  }, [preview, activeFeature, anthropicApiKey]);
 
   // Direct function - no useCallback to avoid stale closure issues
   const handleShowPreview = (feature: ActiveFeature) => {
@@ -92,51 +104,62 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
 
   const handleConfirmSend = async () => {
     console.log('=== handleConfirmSend START ===');
-    console.log('anthropicApiKey:', !!anthropicApiKey);
-    console.log('preview:', !!preview);
-    console.log('activeFeature:', activeFeature);
 
-    if (!anthropicApiKey || !preview || !activeFeature) {
+    // Use refs to get current values (avoid stale closures)
+    const currentApiKey = apiKeyRef.current;
+    const currentPreview = previewRef.current;
+    const currentFeature = activeFeatureRef.current;
+
+    console.log('anthropicApiKey (ref):', !!currentApiKey);
+    console.log('preview (ref):', !!currentPreview);
+    console.log('activeFeature (ref):', currentFeature);
+
+    if (!currentApiKey || !currentPreview || !currentFeature) {
       console.log('EARLY RETURN - missing:', {
-        apiKey: !anthropicApiKey,
-        preview: !preview,
-        activeFeature: !activeFeature
+        apiKey: !currentApiKey,
+        preview: !currentPreview,
+        activeFeature: !currentFeature
       });
       return;
     }
 
     console.log('Setting loading state...');
+
+    // Update state synchronously
+    setRenderKey(k => k + 1);
     setLoading(true);
     setError(null);
 
-    // Force browser repaint - reading offsetHeight triggers reflow
-    await new Promise(resolve => {
-      requestAnimationFrame(() => {
-        document.body.offsetHeight; // Force reflow
-        requestAnimationFrame(resolve); // Wait for next frame
-      });
+    // Force a synchronous DOM update
+    await new Promise<void>(resolve => {
+      setTimeout(() => {
+        console.log('After timeout, loading should be visible');
+        resolve();
+      }, 100);
     });
-    console.log('Forced repaint, now making API call...');
 
     try {
-      console.log('Making API call for:', activeFeature);
-      if (activeFeature === 'plotSummary') {
-        const result = await getPlotSummary(anthropicApiKey, preview.anonymizedData);
+      console.log('Making API call for:', currentFeature);
+      if (currentFeature === 'plotSummary') {
+        const result = await getPlotSummary(currentApiKey, currentPreview.anonymizedData);
         console.log('Got plot summary result');
         setPlotSummary(result);
       } else {
-        const result = await getCoachingInsights(anthropicApiKey, preview.anonymizedData);
+        const result = await getCoachingInsights(currentApiKey, currentPreview.anonymizedData);
         console.log('Got coaching insights result');
         setInsights(result);
       }
       setPreview(null);
+      setRenderKey(k => k + 1);
       console.log('=== handleConfirmSend END (success) ===');
     } catch (err) {
       console.error('API call error:', err);
       setError(err instanceof Error ? err.message : 'Failed to get response');
+      setRenderKey(k => k + 1);
       console.log('=== handleConfirmSend END (error) ===');
     } finally {
       setLoading(false);
+      setRenderKey(k => k + 1);
     }
   };
 
@@ -281,7 +304,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
   if (loading) {
     console.log('>>> Rendering: LOADING state');
     return (
-      <div className={styles.container} style={{ border: '3px solid orange' }}>
+      <div key={`loading-${renderKey}`} className={styles.container} style={{ border: '3px solid orange' }}>
         <div style={{ background: 'orange', color: 'white', padding: '4px 8px', marginBottom: '8px', fontSize: '12px' }}>
           STATE: LOADING (sending to Claude API)
         </div>
