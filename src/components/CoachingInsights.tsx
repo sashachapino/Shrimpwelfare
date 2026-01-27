@@ -37,10 +37,14 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
       setApiKeyInput('');
       // After saving key, show preview for the intended feature
       if (activeFeature) {
-        const previewData = activeFeature === 'plotSummary'
-          ? getPlotSummaryPreview(client)
-          : getAnonymizationPreview(client);
-        setPreview(previewData);
+        try {
+          const previewData = activeFeature === 'plotSummary'
+            ? getPlotSummaryPreview(client)
+            : getAnonymizationPreview(client);
+          setPreview(previewData);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to generate preview');
+        }
       }
     }
   };
@@ -121,6 +125,8 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
   }
 
   if (preview) {
+    const replacements = preview.anonymizedData?.allReplacements ?? [];
+
     return (
       <div className={styles.container}>
         <div className={styles.previewSection}>
@@ -141,11 +147,11 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
             </p>
           </div>
 
-          {preview.anonymizedData.allReplacements.length > 0 && (
+          {replacements.length > 0 && (
             <div className={styles.replacementsList}>
               <h4>Automatic replacements made:</h4>
               <ul>
-                {preview.anonymizedData.allReplacements.map((r, i) => (
+                {replacements.map((r, i) => (
                   <li key={i}>{r}</li>
                 ))}
               </ul>
@@ -165,7 +171,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
 
           {showFullPreview && (
             <div className={styles.fullPreview}>
-              <pre>{preview.promptPreview}</pre>
+              <pre>{preview.promptPreview ?? ''}</pre>
             </div>
           )}
 
@@ -209,6 +215,11 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
 
   // Show results if we have either insights or plot summary
   if (insights || plotSummary) {
+    const dianaQuestions = insights?.dianaChapman ?? [];
+    const bruceQuestions = insights?.bruceTift ?? [];
+    const fritzQuestions = insights?.fritzPerls ?? [];
+    const summaryParagraphs = typeof plotSummary === 'string' ? plotSummary.split('\n\n') : [];
+
     return (
       <div className={styles.container}>
         {/* Plot Summary Display */}
@@ -224,7 +235,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
               </button>
             </div>
             <div className={styles.plotSummary}>
-              {plotSummary.split('\n\n').map((paragraph, i) => (
+              {summaryParagraphs.map((paragraph, i) => (
                 <p key={i}>{paragraph}</p>
               ))}
             </div>
@@ -250,7 +261,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
                 <span className={styles.perspectiveSubtitle}>Conscious Leadership</span>
               </h3>
               <ul>
-                {insights.dianaChapman.map((q, i) => (
+                {dianaQuestions.map((q, i) => (
                   <li key={i}>{q}</li>
                 ))}
               </ul>
@@ -262,7 +273,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
                 <span className={styles.perspectiveSubtitle}>Developmental/Relational</span>
               </h3>
               <ul>
-                {insights.bruceTift.map((q, i) => (
+                {bruceQuestions.map((q, i) => (
                   <li key={i}>{q}</li>
                 ))}
               </ul>
@@ -274,7 +285,7 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
                 <span className={styles.perspectiveSubtitle}>Gestalt</span>
               </h3>
               <ul>
-                {insights.fritzPerls.map((q, i) => (
+                {fritzQuestions.map((q, i) => (
                   <li key={i}>{q}</li>
                 ))}
               </ul>
