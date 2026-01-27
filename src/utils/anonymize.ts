@@ -175,42 +175,50 @@ export function anonymizeText(text: string, clientName: string): AnonymizationRe
   // 1. Replace client name (case insensitive, whole word)
   if (clientName && clientName.trim()) {
     const nameRegex = new RegExp(`\\b${escapeRegex(clientName)}\\b`, 'gi');
-    if (nameRegex.test(result)) {
+    const before = result;
+    result = result.replace(nameRegex, 'the client');
+    if (result !== before) {
       replacements.push(`Client name "${clientName}" → "the client"`);
-      result = result.replace(nameRegex, 'the client');
     }
 
     // Also try first name only if it contains a space
     const firstName = clientName.split(' ')[0];
     if (firstName && firstName.length > 2) {
       const firstNameRegex = new RegExp(`\\b${escapeRegex(firstName)}\\b`, 'gi');
-      if (firstNameRegex.test(result)) {
+      const beforeFirst = result;
+      result = result.replace(firstNameRegex, 'the client');
+      if (result !== beforeFirst) {
         replacements.push(`First name "${firstName}" → "the client"`);
-        result = result.replace(firstNameRegex, 'the client');
       }
     }
   }
 
   // 2. Remove email addresses
+  PATTERNS.email.lastIndex = 0;
   const emails = result.match(PATTERNS.email);
   if (emails) {
     replacements.push(`Removed ${emails.length} email address(es)`);
+    PATTERNS.email.lastIndex = 0;
     result = result.replace(PATTERNS.email, '[email removed]');
   }
 
   // 3. Remove phone numbers
+  PATTERNS.phone.lastIndex = 0;
   const phones = result.match(PATTERNS.phone);
   if (phones) {
     replacements.push(`Removed ${phones.length} phone number(s)`);
+    PATTERNS.phone.lastIndex = 0;
     result = result.replace(PATTERNS.phone, '[phone removed]');
   }
 
   // 4. Replace dates with generic references
   let dateCount = 0;
   for (const pattern of [PATTERNS.dateSlash, PATTERNS.dateDash, PATTERNS.dateWritten, PATTERNS.dateWrittenShort]) {
+    pattern.lastIndex = 0;
     const matches = result.match(pattern);
     if (matches) {
       dateCount += matches.length;
+      pattern.lastIndex = 0;
       result = result.replace(pattern, '[date]');
     }
   }
@@ -219,9 +227,11 @@ export function anonymizeText(text: string, clientName: string): AnonymizationRe
   }
 
   // 5. Replace street addresses
+  PATTERNS.streetAddress.lastIndex = 0;
   const addresses = result.match(PATTERNS.streetAddress);
   if (addresses) {
     replacements.push(`Removed ${addresses.length} street address(es)`);
+    PATTERNS.streetAddress.lastIndex = 0;
     result = result.replace(PATTERNS.streetAddress, '[address]');
   }
 
@@ -331,30 +341,32 @@ export function anonymizeClientData(client: {
   sessionNotes: Array<{ sessionNumber: number; date: string; notes: string }>;
 }): AnonymizedClientData {
   const allReplacements: string[] = [];
+  const clientName = client.name || '';
+  const sessionNotes = Array.isArray(client.sessionNotes) ? client.sessionNotes : [];
 
   // Anonymize overall notes
-  const overallResult = anonymizeText(client.overallNotes || '', client.name);
+  const overallResult = anonymizeText(client.overallNotes || '', clientName);
   allReplacements.push(...overallResult.replacements);
 
   // Anonymize current questions
-  const questionsResult = anonymizeText(client.currentQuestions || '', client.name);
+  const questionsResult = anonymizeText(client.currentQuestions || '', clientName);
   allReplacements.push(...questionsResult.replacements);
 
   // Anonymize session notes (strip dates, keep session numbers)
-  const anonymizedSessions = client.sessionNotes.map((session) => {
-    const sessionResult = anonymizeText(session.notes || '', client.name);
-    allReplacements.push(...sessionResult.replacements.map(r => `Session ${session.sessionNumber}: ${r}`));
+  const anonymizedSessions = sessionNotes.map((session) => {
+    const sessionResult = anonymizeText(session?.notes || '', clientName);
+    allReplacements.push(...sessionResult.replacements.map(r => `Session ${session?.sessionNumber ?? 0}: ${r}`));
     return {
-      sessionNumber: session.sessionNumber,
+      sessionNumber: session?.sessionNumber ?? 0,
       notes: sessionResult.text,
     };
   });
 
   return {
-    enneagramType: client.enneagramType,
-    enneagramSecondary: client.enneagramSecondary,
-    sessionsCompleted: client.sessionsCompleted,
-    allianceStrength: client.allianceStrength,
+    enneagramType: client.enneagramType ?? '?',
+    enneagramSecondary: client.enneagramSecondary ?? null,
+    sessionsCompleted: client.sessionsCompleted ?? 0,
+    allianceStrength: client.allianceStrength ?? 5,
     overallNotes: overallResult.text,
     currentQuestions: questionsResult.text,
     sessionNotes: anonymizedSessions,
