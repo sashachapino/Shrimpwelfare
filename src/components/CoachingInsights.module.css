@@ -190,6 +190,15 @@
   margin-bottom: 0;
 }
 
+.vitalMatter {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin-bottom: var(--space-sm);
+  padding-left: var(--space-sm);
+  border-left: 2px solid #d8b4fe;
+}
+
 /* Preview Section */
 .previewSection {
   display: flex;

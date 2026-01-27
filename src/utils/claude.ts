@@ -4,10 +4,10 @@ import { anonymizeClientData, type AnonymizedClientData } from './anonymize';
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 
 export interface CoachingInsight {
-  dianaChapman: string[];
-  bruceTift: string[];
-  fritzPerls: string[];
-  genpoRoshi: string[];
+  dianaChapman: { vitalMatter: string; questions: string[] };
+  bruceTift: { vitalMatter: string; questions: string[] };
+  jonathanShedler: { vitalMatter: string; questions: string[] };
+  genpoRoshi: { vitalMatter: string; questions: string[] };
 }
 
 export interface AnonymizationPreview {
@@ -25,9 +25,9 @@ function buildPrompt(data: AnonymizedClientData): string {
     ? `Enneagram: Type ${data.enneagramType}${data.enneagramSecondary ? `/${data.enneagramSecondary}` : ''}`
     : '';
 
-  return `You are helping a coach by generating powerful questions from four distinct therapeutic perspectives. Review the anonymized client notes below and generate questions the coach could ask.
+  return `You are helping a coach by generating insights from four distinct therapeutic perspectives. Review the anonymized client notes below.
 
-IMPORTANT: Do not make assumptions about what is happening or analyze patterns. The notes may be incomplete or ambiguous. Simply generate questions that each practitioner would characteristically ask based on their approach.
+IMPORTANT: The notes may be incomplete or ambiguous. You cannot know who is the coach and who is the client from the notes alone. Do not make assumptions about dynamics or what is "really" happening. Simply offer what each practitioner might notice and wonder about based on their theoretical lens.
 
 ${enneagramInfo ? enneagramInfo + '\n' : ''}Sessions completed: ${data.sessionsCompleted}
 Alliance strength: ${data.allianceStrength}/10
@@ -43,54 +43,53 @@ ${sessionNotesText || '(no session notes yet)'}
 
 ---
 
-Generate questions from these four perspectives:
+For each of the four perspectives below, provide:
+1. Their sense of the "vital matter" - what seems most alive or central to this case
+2. The big questions they would hold or explore
 
 1. DIANA CHAPMAN (Conscious Leadership)
 - Above/below the line awareness
 - Drama triangle (victim/villain/hero)
 - Fact vs. story distinction
-- Body-based awareness
-- Radical responsibility
-- "Where are you right now - above or below the line?"
+- Body-based awareness and radical responsibility
 
 2. BRUCE TIFT (Developmental/Relational)
 - "Already Free" - nothing to fix
 - Developmental trauma and adaptive strategies
 - The invitation to feel what we've been avoiding
 - Holding paradox rather than resolving it
-- Relationship as practice ground
-- "What if this experience is not a problem to solve?"
 
-3. FRITZ PERLS (Gestalt)
-- Present-moment awareness ("What are you aware of right now?")
-- Unfinished business and incomplete gestalts
-- Empty chair technique
-- "How" and "what" over "why"
-- Contact and withdrawal
-- "What do you experience as you say that?"
+3. JONATHAN SHEDLER (Psychodynamic)
+- Recurring patterns and themes across relationships
+- What is being enacted vs. spoken about
+- Defenses as adaptations that once made sense
+- The therapeutic relationship as data
+- "What does the client do rather than feel?"
 
 4. GENPO ROSHI (Big Mind Process)
 - Voice dialogue with different aspects of self
 - Speaking AS different voices (not about them)
 - Big Mind/Big Heart - the awakened perspective
 - The Controller, the Protector, the Skeptic
-- Non-dual awareness alongside dualistic voices
-- "May I speak to the voice of..." / "What does Big Mind have to say about this?"
 
 Respond with this exact JSON format:
 {
-  "dianaChapman": [
-    "3-4 questions Diana Chapman would ask, in her direct style"
-  ],
-  "bruceTift": [
-    "3-4 questions Bruce Tift would ask, with his gentle paradoxical approach"
-  ],
-  "fritzPerls": [
-    "3-4 questions Fritz Perls would ask, focused on present-moment experience"
-  ],
-  "genpoRoshi": [
-    "3-4 Big Mind process invitations Genpo Roshi would offer, inviting the client to speak AS different voices"
-  ]
+  "dianaChapman": {
+    "vitalMatter": "One sentence on what Diana Chapman would see as the vital matter",
+    "questions": ["2-3 questions she would ask"]
+  },
+  "bruceTift": {
+    "vitalMatter": "One sentence on what Bruce Tift would see as the vital matter",
+    "questions": ["2-3 questions he would ask"]
+  },
+  "jonathanShedler": {
+    "vitalMatter": "One sentence on what Jonathan Shedler would see as the vital matter",
+    "questions": ["2-3 questions he would ask"]
+  },
+  "genpoRoshi": {
+    "vitalMatter": "One sentence on what Genpo Roshi would see as the vital matter",
+    "questions": ["2-3 Big Mind invitations to speak AS different voices"]
+  }
 }
 
 Respond ONLY with valid JSON, no additional text.`;
@@ -158,11 +157,12 @@ export async function getCoachingInsights(
     }
 
     const insight = JSON.parse(jsonContent);
+    const defaultPerspective = { vitalMatter: '', questions: [] };
     return {
-      dianaChapman: insight.dianaChapman || [],
-      bruceTift: insight.bruceTift || [],
-      fritzPerls: insight.fritzPerls || [],
-      genpoRoshi: insight.genpoRoshi || [],
+      dianaChapman: insight.dianaChapman || defaultPerspective,
+      bruceTift: insight.bruceTift || defaultPerspective,
+      jonathanShedler: insight.jonathanShedler || defaultPerspective,
+      genpoRoshi: insight.genpoRoshi || defaultPerspective,
     };
   } catch {
     throw new Error('Failed to parse Claude response');

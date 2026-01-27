@@ -268,10 +268,11 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
 
   // Show results if we have either insights or plot summary
   if (insights || plotSummary) {
-    const dianaQuestions = insights?.dianaChapman ?? [];
-    const bruceQuestions = insights?.bruceTift ?? [];
-    const fritzQuestions = insights?.fritzPerls ?? [];
-    const genpoQuestions = insights?.genpoRoshi ?? [];
+    const defaultPerspective = { vitalMatter: '', questions: [] };
+    const diana = insights?.dianaChapman ?? defaultPerspective;
+    const bruce = insights?.bruceTift ?? defaultPerspective;
+    const jonathan = insights?.jonathanShedler ?? defaultPerspective;
+    const genpo = insights?.genpoRoshi ?? defaultPerspective;
     const summaryParagraphs = typeof plotSummary === 'string' ? plotSummary.split('\n\n') : [];
 
     return (
@@ -296,13 +297,13 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
           </>
         )}
 
-        {/* Coaching Questions Display */}
+        {/* Coaching Insights Display */}
         {insights && (
           <>
             <div className={styles.header}>
               <h2>
                 <Sparkles size={20} />
-                Coaching Questions
+                Coaching Insights
               </h2>
               <button type="button" onClick={() => handleShowPreview('questions')} className={styles.refreshBtn}>
                 Refresh
@@ -314,8 +315,11 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
                 Diana Chapman
                 <span className={styles.perspectiveSubtitle}>Conscious Leadership</span>
               </h3>
+              {diana.vitalMatter && (
+                <p className={styles.vitalMatter}>{diana.vitalMatter}</p>
+              )}
               <ul>
-                {dianaQuestions.map((q, i) => (
+                {(diana.questions ?? []).map((q, i) => (
                   <li key={i}>{q}</li>
                 ))}
               </ul>
@@ -326,8 +330,11 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
                 Bruce Tift
                 <span className={styles.perspectiveSubtitle}>Developmental/Relational</span>
               </h3>
+              {bruce.vitalMatter && (
+                <p className={styles.vitalMatter}>{bruce.vitalMatter}</p>
+              )}
               <ul>
-                {bruceQuestions.map((q, i) => (
+                {(bruce.questions ?? []).map((q, i) => (
                   <li key={i}>{q}</li>
                 ))}
               </ul>
@@ -335,11 +342,14 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
 
             <div className={styles.insightSection}>
               <h3 className={styles.perspectiveTitle}>
-                Fritz Perls
-                <span className={styles.perspectiveSubtitle}>Gestalt</span>
+                Jonathan Shedler
+                <span className={styles.perspectiveSubtitle}>Psychodynamic</span>
               </h3>
+              {jonathan.vitalMatter && (
+                <p className={styles.vitalMatter}>{jonathan.vitalMatter}</p>
+              )}
               <ul>
-                {fritzQuestions.map((q, i) => (
+                {(jonathan.questions ?? []).map((q, i) => (
                   <li key={i}>{q}</li>
                 ))}
               </ul>
@@ -350,8 +360,11 @@ function CoachingInsightsInner({ client }: CoachingInsightsProps) {
                 Genpo Roshi
                 <span className={styles.perspectiveSubtitle}>Big Mind Process</span>
               </h3>
+              {genpo.vitalMatter && (
+                <p className={styles.vitalMatter}>{genpo.vitalMatter}</p>
+              )}
               <ul>
-                {genpoQuestions.map((q, i) => (
+                {(genpo.questions ?? []).map((q, i) => (
                   <li key={i}>{q}</li>
                 ))}
               </ul>
