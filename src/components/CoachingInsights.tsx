@@ -86,22 +86,41 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
   };
 
   const handleConfirmSend = async () => {
-    if (!anthropicApiKey || !preview || !activeFeature) return;
+    console.log('=== handleConfirmSend START ===');
+    console.log('anthropicApiKey:', !!anthropicApiKey);
+    console.log('preview:', !!preview);
+    console.log('activeFeature:', activeFeature);
 
+    if (!anthropicApiKey || !preview || !activeFeature) {
+      console.log('EARLY RETURN - missing:', {
+        apiKey: !anthropicApiKey,
+        preview: !preview,
+        activeFeature: !activeFeature
+      });
+      return;
+    }
+
+    console.log('Setting loading state...');
     setLoading(true);
     setError(null);
 
     try {
+      console.log('Making API call for:', activeFeature);
       if (activeFeature === 'plotSummary') {
         const result = await getPlotSummary(anthropicApiKey, preview.anonymizedData);
+        console.log('Got plot summary result');
         setPlotSummary(result);
       } else {
         const result = await getCoachingInsights(anthropicApiKey, preview.anonymizedData);
+        console.log('Got coaching insights result');
         setInsights(result);
       }
       setPreview(null);
+      console.log('=== handleConfirmSend END (success) ===');
     } catch (err) {
+      console.error('API call error:', err);
       setError(err instanceof Error ? err.message : 'Failed to get response');
+      console.log('=== handleConfirmSend END (error) ===');
     } finally {
       setLoading(false);
     }
@@ -215,10 +234,28 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
           )}
 
           <div className={styles.previewActions}>
-            <button type="button" onClick={handleConfirmSend} className="btn-accent">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Confirm & Send button clicked!');
+                handleConfirmSend();
+              }}
+              className="btn-accent"
+            >
               Confirm & Send
             </button>
-            <button type="button" onClick={handleCancel} className="btn-ghost">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Cancel button clicked!');
+                handleCancel();
+              }}
+              className="btn-ghost"
+            >
               Cancel
             </button>
           </div>
