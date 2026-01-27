@@ -58,6 +58,11 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
       setError(null);
       setPreview(previewData);
 
+      // Force browser repaint
+      requestAnimationFrame(() => {
+        document.body.offsetHeight;
+      });
+
       console.log('=== handleShowPreview END (success) ===');
     } catch (err) {
       console.error('Error in handleShowPreview:', err);
@@ -103,6 +108,15 @@ export function CoachingInsights({ client }: CoachingInsightsProps) {
     console.log('Setting loading state...');
     setLoading(true);
     setError(null);
+
+    // Force browser repaint - reading offsetHeight triggers reflow
+    await new Promise(resolve => {
+      requestAnimationFrame(() => {
+        document.body.offsetHeight; // Force reflow
+        requestAnimationFrame(resolve); // Wait for next frame
+      });
+    });
+    console.log('Forced repaint, now making API call...');
 
     try {
       console.log('Making API call for:', activeFeature);
