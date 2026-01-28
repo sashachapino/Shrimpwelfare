@@ -131,6 +131,19 @@ def presets():
 
 
 @main.command()
+def gui():
+    """
+    Launch the atmospheric GUI.
+
+    A moody, minimal interface where a photograph serves as the
+    generate button. You can load your own image or use the
+    procedurally generated atmospheric placeholder.
+    """
+    from .gui import main as gui_main
+    gui_main()
+
+
+@main.command()
 @click.option(
     "-n", "--count",
     type=int,

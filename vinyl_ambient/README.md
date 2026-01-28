@@ -61,6 +61,19 @@ Available presets:
 vinyl-ambient browse -n 10
 ```
 
+### GUI
+
+Launch the atmospheric visual interface:
+
+```bash
+vinyl-ambient gui
+```
+
+A moody, minimal window appears with a soft-focus photograph as the central button. Click the image to generate. You can:
+- **Load your own image** - Use any black & white photograph as the button
+- **Select a mood preset** - Choose the effect character
+- The interface generates a procedural Saul Leiter-esque image if you don't load one
+
 ## Python API
 
 ```python
