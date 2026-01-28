@@ -47,87 +47,52 @@ COLORS = {
 def generate_atmospheric_image(width: int = 400, height: int = 500) -> "Image.Image":
     """
     Generate a procedural atmospheric image with Saul Leiter-esque qualities.
+    Simple, guaranteed-to-work version.
     """
     if not HAS_PIL:
         return None
 
-    # Start with a warmer, more visible base
-    img = Image.new("RGB", (width, height), (20, 18, 15))
+    # Create gradient background - sepia tones
+    img = Image.new("RGB", (width, height))
+    pixels = img.load()
+
+    for y in range(height):
+        for x in range(width):
+            # Base gradient from dark brown to lighter sepia
+            t = y / height
+            r = int(40 + 80 * (1 - t))
+            g = int(30 + 60 * (1 - t))
+            b = int(25 + 40 * (1 - t))
+            pixels[x, y] = (r, g, b)
+
     draw = ImageDraw.Draw(img)
 
-    # Add larger, more visible abstract shapes
-    for _ in range(random.randint(3, 5)):
-        x = random.randint(-100, width - 50)
-        y = random.randint(-100, height - 50)
-        w = random.randint(150, 350)
-        h = random.randint(200, 450)
+    # Add soft light shapes
+    for _ in range(3):
+        cx = random.randint(50, width - 50)
+        cy = random.randint(50, height - 50)
 
-        # Brighter, more visible colors
-        colors = [
-            (70, 60, 50),    # Warm brown
-            (80, 70, 60),    # Light sepia
-            (60, 55, 65),    # Cool violet-gray
-            (90, 75, 60),    # Golden brown
-            (50, 50, 55),    # Blue-gray
-        ]
-        color = random.choice(colors)
-
-        # Build up layers for soft edges
-        for i in range(25, 0, -1):
-            expand = i * 4
-            brightness_boost = i * 3
-            layer_color = tuple(min(255, c + brightness_boost) for c in color)
+        # Draw concentric ellipses for soft glow
+        for radius in range(150, 10, -5):
+            brightness = 60 + (150 - radius)
+            color = (
+                min(255, brightness + 30),
+                min(255, brightness + 15),
+                min(255, brightness)
+            )
             draw.ellipse(
-                [x - expand, y - expand, x + w + expand, y + h + expand],
-                fill=layer_color
+                [cx - radius, cy - radius * 1.3, cx + radius, cy + radius * 1.3],
+                fill=color
             )
 
-    # Add prominent light sources (like window light falling on skin)
-    for _ in range(random.randint(2, 3)):
-        x = random.randint(width // 6, 5 * width // 6)
-        y = random.randint(height // 6, 4 * height // 6)
+    # Blur for softness
+    img = img.filter(ImageFilter.GaussianBlur(radius=20))
 
-        for i in range(40, 0, -1):
-            # Warmer, brighter light
-            brightness = 50 + i * 2
-            r = min(255, brightness + 20)
-            g = min(255, brightness + 10)
-            b = min(255, brightness - 10)
-            draw.ellipse(
-                [x - i * 5, y - i * 4, x + i * 5, y + i * 6],
-                fill=(r, g, b)
-            )
-
-    # Soften with blur
-    img = img.filter(ImageFilter.GaussianBlur(radius=25))
-
-    # Add film grain
-    img_array = np.array(img)
-    noise = np.random.normal(0, 12, img_array.shape).astype(np.int16)
-    img_array = np.clip(img_array.astype(np.int16) + noise, 0, 255).astype(np.uint8)
+    # Add grain
+    img_array = np.array(img, dtype=np.int16)
+    noise = np.random.randint(-15, 15, img_array.shape, dtype=np.int16)
+    img_array = np.clip(img_array + noise, 0, 255).astype(np.uint8)
     img = Image.fromarray(img_array)
-
-    # Add vignette
-    vignette = Image.new("L", (width, height), 0)
-    vignette_draw = ImageDraw.Draw(vignette)
-    for i in range(min(width, height) // 2):
-        gray = int(255 * (i / (min(width, height) / 2)) ** 0.7)
-        vignette_draw.ellipse(
-            [width//2 - i*2, height//2 - i*2, width//2 + i*2, height//2 + i*2],
-            fill=gray
-        )
-
-    # Apply vignette
-    img_array = np.array(img)
-    vignette_array = np.array(vignette)[:, :, np.newaxis] / 255.0
-    img_array = (img_array * vignette_array).astype(np.uint8)
-    img = Image.fromarray(img_array)
-
-    # Slight warm tint
-    img_array = np.array(img).astype(np.float32)
-    img_array[:, :, 0] = np.clip(img_array[:, :, 0] * 1.1, 0, 255)  # Red
-    img_array[:, :, 2] = np.clip(img_array[:, :, 2] * 0.9, 0, 255)  # Blue
-    img = Image.fromarray(img_array.astype(np.uint8))
 
     return img
 
@@ -401,6 +366,7 @@ class VinylAmbientGUI:
     def _load_or_generate_image(self):
         """Load or generate the atmospheric image."""
         if not HAS_PIL:
+            print("PIL not available, using text fallback")
             self.photo_label.configure(
                 text="[ click to play ]",
                 fg=COLORS["text_muted"],
@@ -412,17 +378,28 @@ class VinylAmbientGUI:
 
         try:
             if self.custom_image_path and self.custom_image_path.exists():
+                print(f"Loading custom image: {self.custom_image_path}")
                 img = Image.open(self.custom_image_path)
                 img.thumbnail((400, 500), Image.Resampling.LANCZOS)
                 img = img.convert("L").convert("RGB")
                 img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
             else:
+                print("Generating atmospheric image...")
                 img = generate_atmospheric_image(400, 500)
+                print(f"Generated image: {img.size if img else 'None'}")
 
             if img:
                 self.photo_image = ImageTk.PhotoImage(img)
                 self.photo_label.configure(image=self.photo_image)
+                # Keep reference to prevent garbage collection
+                self.photo_label.image = self.photo_image
+                print("Image displayed successfully")
+            else:
+                raise ValueError("Image generation returned None")
         except Exception as e:
+            print(f"Error loading/generating image: {e}")
+            import traceback
+            traceback.print_exc()
             self.photo_label.configure(
                 text="[ click to play ]",
                 fg=COLORS["text_muted"],
