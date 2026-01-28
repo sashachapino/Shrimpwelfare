@@ -285,9 +285,17 @@
 }
 
 .clientName {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
   font-size: var(--text-lg);
   margin-bottom: var(--space-xs);
   color: var(--color-text-primary);
+}
+
+.missingNotesIcon {
+  color: #dc2626;
+  flex-shrink: 0;
 }
 
 .clientMeta {
