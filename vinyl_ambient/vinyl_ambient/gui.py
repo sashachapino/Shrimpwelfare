@@ -8,7 +8,7 @@ for continuous ambient streaming - like a haunted radio.
 import threading
 import queue
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, Canvas
 from pathlib import Path
 from typing import Optional
 import random
@@ -32,7 +32,7 @@ from .effects import EffectSettings, process_sample, create_effect_preset
 from .archive_fetcher import fetch_random_vinyl_sample
 
 
-# Color palette - muted, atmospheric
+# Color palette
 COLORS = {
     "bg_dark": "#0a0a0a",
     "bg_medium": "#1a1a1a",
@@ -43,73 +43,62 @@ COLORS = {
     "playing": "#8fa882",
 }
 
+IMAGE_WIDTH = 400
+IMAGE_HEIGHT = 500
+
 
 def generate_atmospheric_image(width: int = 400, height: int = 500) -> "Image.Image":
-    """
-    Generate a procedural atmospheric image with Saul Leiter-esque qualities.
-    Simple, guaranteed-to-work version.
-    """
+    """Generate a procedural atmospheric image."""
     if not HAS_PIL:
         return None
 
-    # Create gradient background - sepia tones
-    img = Image.new("RGB", (width, height))
-    pixels = img.load()
-
-    for y in range(height):
-        for x in range(width):
-            # Base gradient from dark brown to lighter sepia
-            t = y / height
-            r = int(40 + 80 * (1 - t))
-            g = int(30 + 60 * (1 - t))
-            b = int(25 + 40 * (1 - t))
-            pixels[x, y] = (r, g, b)
-
+    # Create with obvious visible colors for debugging
+    img = Image.new("RGB", (width, height), (60, 50, 45))
     draw = ImageDraw.Draw(img)
 
-    # Add soft light shapes
-    for _ in range(3):
+    # Add visible warm gradient shapes
+    for _ in range(4):
         cx = random.randint(50, width - 50)
         cy = random.randint(50, height - 50)
 
-        # Draw concentric ellipses for soft glow
-        for radius in range(150, 10, -5):
-            brightness = 60 + (150 - radius)
+        for radius in range(180, 10, -8):
+            brightness = 80 + (180 - radius) // 2
             color = (
-                min(255, brightness + 30),
-                min(255, brightness + 15),
+                min(255, brightness + 40),
+                min(255, brightness + 20),
                 min(255, brightness)
             )
             draw.ellipse(
-                [cx - radius, cy - radius * 1.3, cx + radius, cy + radius * 1.3],
+                [cx - radius, cy - int(radius * 1.2),
+                 cx + radius, cy + int(radius * 1.2)],
                 fill=color
             )
 
-    # Blur for softness
-    img = img.filter(ImageFilter.GaussianBlur(radius=20))
+    # Blur
+    img = img.filter(ImageFilter.GaussianBlur(radius=25))
 
     # Add grain
-    img_array = np.array(img, dtype=np.int16)
-    noise = np.random.randint(-15, 15, img_array.shape, dtype=np.int16)
-    img_array = np.clip(img_array + noise, 0, 255).astype(np.uint8)
-    img = Image.fromarray(img_array)
+    arr = np.array(img, dtype=np.int16)
+    noise = np.random.randint(-12, 12, arr.shape, dtype=np.int16)
+    arr = np.clip(arr + noise, 0, 255).astype(np.uint8)
 
-    return img
+    return Image.fromarray(arr)
 
 
 class AudioStreamer:
-    """Handles continuous audio streaming with crossfading samples."""
+    """Handles continuous audio streaming - loops samples while fetching new ones."""
 
     def __init__(self, preset: str = "ghostly", sample_rate: int = 44100):
         self.preset = preset
         self.sample_rate = sample_rate
         self.is_playing = False
-        self.audio_queue = queue.Queue(maxsize=3)
+        self.audio_queue = queue.Queue(maxsize=5)
         self.current_audio = None
         self.current_position = 0
         self.stream = None
         self.fetch_thread = None
         self.status_callback = None
+        self.lock = threading.Lock()
 
     def set_preset(self, preset: str):
         self.preset = preset
@@ -124,27 +113,27 @@ class AudioStreamer:
     def _fetch_worker(self):
         """Background thread that fetches and processes samples."""
         while self.is_playing:
-            if self.audio_queue.qsize() < 2:
-                self._update_status("fetching new vinyl...")
-                try:
+            try:
+                if self.audio_queue.qsize() < 3:
+                    self._update_status("fetching new vinyl...")
                     sample = fetch_random_vinyl_sample(
-                        min_duration=15.0,
-                        max_duration=60.0,
+                        min_duration=20.0,
+                        max_duration=90.0,
                     )
                     if sample:
                         self._update_status("processing...")
                         settings = create_effect_preset(self.preset)
-                        # Add some randomization
+                        # Randomize slightly
                         settings = EffectSettings(
-                            slowdown_factor=settings.slowdown_factor * random.uniform(0.8, 1.2),
+                            slowdown_factor=settings.slowdown_factor * random.uniform(0.85, 1.15),
                             reverb_room_size=settings.reverb_room_size,
                             reverb_damping=settings.reverb_damping,
                             reverb_wet_level=settings.reverb_wet_level,
                             reverb_dry_level=settings.reverb_dry_level,
-                            delay_seconds=settings.delay_seconds * random.uniform(0.8, 1.3),
+                            delay_seconds=settings.delay_seconds * random.uniform(0.9, 1.2),
                             delay_feedback=settings.delay_feedback,
                             delay_mix=settings.delay_mix,
-                            wow_depth=settings.wow_depth * random.uniform(0.7, 1.5),
+                            wow_depth=settings.wow_depth * random.uniform(0.8, 1.3),
                             wow_rate=settings.wow_rate,
                             flutter_depth=settings.flutter_depth,
                             flutter_rate=settings.flutter_rate,
@@ -164,44 +153,56 @@ class AudioStreamer:
                             processed = signal.resample(processed, num_samples)
 
                         self.audio_queue.put(processed)
-                        self._update_status(f"playing: {sample.source_title[:30]}...")
-                except Exception as e:
-                    self._update_status(f"fetch error, retrying...")
+                        title = sample.source_title[:35] if sample.source_title else "unknown"
+                        self._update_status(f"playing: {title}...")
+                    else:
+                        self._update_status("fetch failed, retrying...")
+                        time.sleep(3)
+                else:
                     time.sleep(2)
-            else:
-                time.sleep(1)
+            except Exception as e:
+                print(f"Fetch error: {e}")
+                self._update_status("error, retrying...")
+                time.sleep(3)
 
     def _audio_callback(self, outdata, frames, time_info, status):
-        """Callback for sounddevice stream."""
+        """Callback for sounddevice stream - loops current sample if queue empty."""
         if not self.is_playing:
             outdata.fill(0)
             return
 
-        output = np.zeros(frames)
-        remaining = frames
-        pos = 0
+        with self.lock:
+            output = np.zeros(frames, dtype=np.float32)
+            remaining = frames
+            pos = 0
 
-        while remaining > 0:
-            if self.current_audio is None or self.current_position >= len(self.current_audio):
-                # Need new audio
-                try:
-                    self.current_audio = self.audio_queue.get_nowait()
-                    self.current_position = 0
-                except queue.Empty:
-                    # Fill with silence if no audio ready
-                    output[pos:] = 0
-                    break
+            while remaining > 0:
+                # Try to get new audio if we need it
+                if self.current_audio is None or self.current_position >= len(self.current_audio):
+                    try:
+                        new_audio = self.audio_queue.get_nowait()
+                        self.current_audio = new_audio
+                        self.current_position = 0
+                    except queue.Empty:
+                        # Loop current audio if we have it
+                        if self.current_audio is not None and len(self.current_audio) > 0:
+                            self.current_position = 0
+                        else:
+                            # No audio yet - output silence
+                            output[pos:] = 0
+                            break
 
-            # Copy available audio
-            available = len(self.current_audio) - self.current_position
-            to_copy = min(remaining, available)
-            output[pos:pos + to_copy] = self.current_audio[self.current_position:self.current_position + to_copy]
-            self.current_position += to_copy
-            pos += to_copy
-            remaining -= to_copy
+                if self.current_audio is not None:
+                    available = len(self.current_audio) - self.current_position
+                    to_copy = min(remaining, available)
+                    output[pos:pos + to_copy] = self.current_audio[
+                        self.current_position:self.current_position + to_copy
+                    ]
+                    self.current_position += to_copy
+                    pos += to_copy
+                    remaining -= to_copy
 
-        # Apply gentle fade at edges to avoid clicks
-        outdata[:, 0] = output * 0.8  # Slight volume reduction
+            outdata[:, 0] = output * 0.7
 
     def start(self):
         """Start streaming audio."""
@@ -210,36 +211,47 @@ class AudioStreamer:
             return
 
         self.is_playing = True
+        self.current_audio = None
+        self.current_position = 0
+
+        # Clear any old audio
+        while not self.audio_queue.empty():
+            try:
+                self.audio_queue.get_nowait()
+            except queue.Empty:
+                break
 
         # Start fetch thread
         self.fetch_thread = threading.Thread(target=self._fetch_worker, daemon=True)
         self.fetch_thread.start()
 
         # Start audio stream
-        self.stream = sd.OutputStream(
-            samplerate=self.sample_rate,
-            channels=1,
-            callback=self._audio_callback,
-            blocksize=4096,
-        )
-        self.stream.start()
-        self._update_status("starting stream...")
+        try:
+            self.stream = sd.OutputStream(
+                samplerate=self.sample_rate,
+                channels=1,
+                callback=self._audio_callback,
+                blocksize=2048,
+                dtype=np.float32,
+            )
+            self.stream.start()
+            self._update_status("starting stream...")
+        except Exception as e:
+            print(f"Audio stream error: {e}")
+            self._update_status(f"audio error: {e}")
+            self.is_playing = False
 
     def stop(self):
         """Stop streaming."""
         self.is_playing = False
         if self.stream:
-            self.stream.stop()
-            self.stream.close()
+            try:
+                self.stream.stop()
+                self.stream.close()
+            except Exception:
+                pass
             self.stream = None
         self._update_status("stopped")
-
-        # Clear queue
-        while not self.audio_queue.empty():
-            try:
-                self.audio_queue.get_nowait()
-            except queue.Empty:
-                break
 
 
 class VinylAmbientGUI:
@@ -251,55 +263,50 @@ class VinylAmbientGUI:
         self.root.configure(bg=COLORS["bg_dark"])
         self.root.resizable(False, False)
 
-        # State
         self.is_playing = False
         self.current_preset = "ghostly"
         self.custom_image_path: Optional[Path] = None
         self.streamer = AudioStreamer(preset=self.current_preset)
         self.streamer.set_status_callback(self._update_status_threadsafe)
+        self.photo_image = None  # Keep reference
 
         self._setup_ui()
-        self._load_or_generate_image()
+        self._create_image()
 
     def _setup_ui(self):
-        """Build the atmospheric interface."""
+        """Build the interface."""
         self.main_frame = tk.Frame(self.root, bg=COLORS["bg_dark"], padx=40, pady=30)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
 
         # Title
-        title = tk.Label(
+        tk.Label(
             self.main_frame,
             text="vinyl ambient",
-            font=("Helvetica Neue", 14, "normal"),
+            font=("Helvetica", 14),
             fg=COLORS["text_muted"],
             bg=COLORS["bg_dark"],
-        )
-        title.pack(pady=(0, 20))
+        ).pack(pady=(0, 20))
 
-        # Photo frame (play/pause button)
-        self.photo_frame = tk.Frame(
+        # Canvas for the image (more reliable than Label)
+        self.canvas = Canvas(
             self.main_frame,
+            width=IMAGE_WIDTH,
+            height=IMAGE_HEIGHT,
             bg=COLORS["bg_medium"],
             highlightthickness=2,
             highlightbackground=COLORS["text_muted"],
-        )
-        self.photo_frame.pack()
-
-        self.photo_label = tk.Label(
-            self.photo_frame,
-            bg=COLORS["bg_medium"],
             cursor="hand2",
         )
-        self.photo_label.pack(padx=2, pady=2)
-        self.photo_label.bind("<Button-1>", self._on_photo_click)
-        self.photo_label.bind("<Enter>", self._on_hover_enter)
-        self.photo_label.bind("<Leave>", self._on_hover_leave)
+        self.canvas.pack()
+        self.canvas.bind("<Button-1>", self._on_click)
+        self.canvas.bind("<Enter>", self._on_hover_enter)
+        self.canvas.bind("<Leave>", self._on_hover_leave)
 
         # Instruction
         self.instruction_label = tk.Label(
             self.main_frame,
             text="click to play",
-            font=("Helvetica Neue", 10),
+            font=("Helvetica", 10),
             fg=COLORS["text_muted"],
             bg=COLORS["bg_dark"],
         )
@@ -309,7 +316,7 @@ class VinylAmbientGUI:
         self.status_label = tk.Label(
             self.main_frame,
             text="",
-            font=("Helvetica Neue", 9),
+            font=("Helvetica", 9),
             fg=COLORS["text_muted"],
             bg=COLORS["bg_dark"],
         )
@@ -319,20 +326,15 @@ class VinylAmbientGUI:
         controls = tk.Frame(self.main_frame, bg=COLORS["bg_dark"])
         controls.pack(fill=tk.X, pady=(10, 0))
 
-        preset_label = tk.Label(
-            controls,
-            text="mood",
-            font=("Helvetica Neue", 9),
-            fg=COLORS["text_muted"],
-            bg=COLORS["bg_dark"],
-        )
-        preset_label.pack(side=tk.LEFT)
+        tk.Label(
+            controls, text="mood", font=("Helvetica", 9),
+            fg=COLORS["text_muted"], bg=COLORS["bg_dark"],
+        ).pack(side=tk.LEFT)
 
         self.preset_var = tk.StringVar(value=self.current_preset)
         style = ttk.Style()
         style.theme_use("clam")
-        style.configure(
-            "Dark.TCombobox",
+        style.configure("Dark.TCombobox",
             fieldbackground=COLORS["bg_medium"],
             background=COLORS["bg_medium"],
             foreground=COLORS["text_light"],
@@ -349,66 +351,50 @@ class VinylAmbientGUI:
         self.preset_combo.pack(side=tk.LEFT, padx=(10, 20))
         self.preset_combo.bind("<<ComboboxSelected>>", self._on_preset_change)
 
-        # Load image button
         load_btn = tk.Label(
-            controls,
-            text="load image",
-            font=("Helvetica Neue", 9),
-            fg=COLORS["text_muted"],
-            bg=COLORS["bg_dark"],
-            cursor="hand2",
+            controls, text="load image", font=("Helvetica", 9),
+            fg=COLORS["text_muted"], bg=COLORS["bg_dark"], cursor="hand2",
         )
         load_btn.pack(side=tk.RIGHT)
         load_btn.bind("<Button-1>", self._load_custom_image)
         load_btn.bind("<Enter>", lambda e: load_btn.configure(fg=COLORS["accent"]))
         load_btn.bind("<Leave>", lambda e: load_btn.configure(fg=COLORS["text_muted"]))
 
-    def _load_or_generate_image(self):
-        """Load or generate the atmospheric image."""
+    def _create_image(self):
+        """Create and display the image on canvas."""
         if not HAS_PIL:
-            print("PIL not available, using text fallback")
-            self.photo_label.configure(
+            self.canvas.create_text(
+                IMAGE_WIDTH // 2, IMAGE_HEIGHT // 2,
                 text="[ click to play ]",
-                fg=COLORS["text_muted"],
-                font=("Helvetica Neue", 12),
-                width=40,
-                height=20,
+                fill=COLORS["text_muted"],
+                font=("Helvetica", 14),
             )
             return
 
         try:
             if self.custom_image_path and self.custom_image_path.exists():
-                print(f"Loading custom image: {self.custom_image_path}")
                 img = Image.open(self.custom_image_path)
-                img.thumbnail((400, 500), Image.Resampling.LANCZOS)
+                img = img.resize((IMAGE_WIDTH, IMAGE_HEIGHT), Image.Resampling.LANCZOS)
                 img = img.convert("L").convert("RGB")
-                img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
+                img = img.filter(ImageFilter.GaussianBlur(radius=1))
             else:
-                print("Generating atmospheric image...")
-                img = generate_atmospheric_image(400, 500)
-                print(f"Generated image: {img.size if img else 'None'}")
+                img = generate_atmospheric_image(IMAGE_WIDTH, IMAGE_HEIGHT)
 
             if img:
                 self.photo_image = ImageTk.PhotoImage(img)
-                self.photo_label.configure(image=self.photo_image)
-                # Keep reference to prevent garbage collection
-                self.photo_label.image = self.photo_image
-                print("Image displayed successfully")
-            else:
-                raise ValueError("Image generation returned None")
+                self.canvas.delete("all")
+                self.canvas.create_image(0, 0, anchor=tk.NW, image=self.photo_image)
+                print(f"Image created and displayed: {IMAGE_WIDTH}x{IMAGE_HEIGHT}")
         except Exception as e:
-            print(f"Error loading/generating image: {e}")
-            import traceback
-            traceback.print_exc()
-            self.photo_label.configure(
+            print(f"Image error: {e}")
+            self.canvas.create_text(
+                IMAGE_WIDTH // 2, IMAGE_HEIGHT // 2,
                 text="[ click to play ]",
-                fg=COLORS["text_muted"],
-                font=("Helvetica Neue", 12),
-                width=40,
-                height=20,
+                fill=COLORS["text_muted"],
+                font=("Helvetica", 14),
             )
 
-    def _on_photo_click(self, event):
+    def _on_click(self, event):
         """Toggle play/pause."""
         if self.is_playing:
             self._stop_playback()
@@ -416,77 +402,61 @@ class VinylAmbientGUI:
             self._start_playback()
 
     def _start_playback(self):
-        """Start the ambient stream."""
         self.is_playing = True
         self.instruction_label.configure(text="click to stop", fg=COLORS["playing"])
-        self.photo_frame.configure(highlightbackground=COLORS["playing"])
+        self.canvas.configure(highlightbackground=COLORS["playing"])
         self.streamer.set_preset(self.current_preset)
         self.streamer.start()
 
     def _stop_playback(self):
-        """Stop the ambient stream."""
         self.is_playing = False
         self.instruction_label.configure(text="click to play", fg=COLORS["text_muted"])
-        self.photo_frame.configure(highlightbackground=COLORS["text_muted"])
+        self.canvas.configure(highlightbackground=COLORS["text_muted"])
         self.streamer.stop()
 
     def _on_hover_enter(self, event):
-        if self.is_playing:
-            self.photo_frame.configure(highlightbackground=COLORS["accent"])
-        else:
-            self.photo_frame.configure(highlightbackground=COLORS["accent_dim"])
+        color = COLORS["accent"] if self.is_playing else COLORS["accent_dim"]
+        self.canvas.configure(highlightbackground=color)
 
     def _on_hover_leave(self, event):
-        if self.is_playing:
-            self.photo_frame.configure(highlightbackground=COLORS["playing"])
-        else:
-            self.photo_frame.configure(highlightbackground=COLORS["text_muted"])
+        color = COLORS["playing"] if self.is_playing else COLORS["text_muted"]
+        self.canvas.configure(highlightbackground=color)
 
     def _on_preset_change(self, event):
         self.current_preset = self.preset_var.get()
         self.streamer.set_preset(self.current_preset)
 
     def _load_custom_image(self, event):
-        file_path = filedialog.askopenfilename(
+        path = filedialog.askopenfilename(
             filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp *.tiff")],
             title="choose image",
         )
-        if file_path:
-            self.custom_image_path = Path(file_path)
-            self._load_or_generate_image()
+        if path:
+            self.custom_image_path = Path(path)
+            self._create_image()
 
     def _update_status_threadsafe(self, text: str):
-        """Update status from any thread."""
         self.root.after(0, lambda: self.status_label.configure(text=text))
 
     def run(self):
-        """Start the GUI."""
         self.root.update_idletasks()
-        width = self.root.winfo_width()
-        height = self.root.winfo_height()
-        x = (self.root.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.root.winfo_screenheight() // 2) - (height // 2)
+        x = (self.root.winfo_screenwidth() // 2) - (IMAGE_WIDTH // 2 + 40)
+        y = (self.root.winfo_screenheight() // 2) - (IMAGE_HEIGHT // 2 + 100)
         self.root.geometry(f"+{x}+{y}")
-
-        # Handle window close
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.mainloop()
 
     def _on_close(self):
-        """Clean up on window close."""
         if self.is_playing:
             self.streamer.stop()
         self.root.destroy()
 
 
 def main():
-    """Launch the GUI."""
     if not HAS_PIL:
-        print("Warning: Pillow not installed for atmospheric images")
+        print("Warning: Pillow not installed")
     if not HAS_SOUNDDEVICE:
-        print("Warning: sounddevice not installed - audio playback disabled")
-        print("Install with: pip install sounddevice")
-
+        print("Warning: sounddevice not installed")
     app = VinylAmbientGUI()
     app.run()
 
