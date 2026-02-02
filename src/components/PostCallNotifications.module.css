@@ -49,19 +49,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-tertiary);
-  background: transparent;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  color: #92400e;
+  background: rgba(146, 64, 14, 0.1);
   border: none;
   cursor: pointer;
   transition: all var(--transition-fast);
+  z-index: 10;
 }
 
 .dismissBtn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--color-text-secondary);
+  background: rgba(146, 64, 14, 0.2);
+  color: #78350f;
 }
 
 .notificationContent {

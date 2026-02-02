@@ -21,12 +21,19 @@ interface NotificationCardProps {
 }
 
 function NotificationCard({ notification, onDismiss }: NotificationCardProps) {
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDismiss(notification.id);
+  };
+
   return (
     <div className={styles.notification}>
       <button
         className={styles.dismissBtn}
-        onClick={() => onDismiss(notification.id)}
+        onClick={handleDismiss}
         title="Dismiss"
+        type="button"
       >
         <X size={16} />
       </button>
