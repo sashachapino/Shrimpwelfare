@@ -191,16 +191,43 @@
 .summaryItem {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-sm) var(--space-md);
+  gap: var(--space-sm);
   background: var(--color-bg-card);
   border-radius: var(--radius-md);
-  text-decoration: none;
   transition: background var(--transition-fast);
 }
 
 .summaryItem:hover {
   background: var(--color-bg-secondary);
+}
+
+.summaryItemLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  text-decoration: none;
+}
+
+.markPaidBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: var(--space-sm);
+  background: #dcfce7;
+  color: #16a34a;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.markPaidBtn:hover {
+  background: #bbf7d0;
+  color: #15803d;
 }
 
 .summaryName {

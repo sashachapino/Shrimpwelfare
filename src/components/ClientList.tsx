@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive, Settings, Download, Upload, X, Cloud, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive, Settings, Download, Upload, X, Cloud, CheckCircle2, AlertCircle, Check } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useCalendar } from '../contexts/CalendarContext';
 import { AllianceIndicator } from './AllianceIndicator';
@@ -73,7 +73,7 @@ function ClientCard({ client }: { client: Client }) {
 }
 
 export function ClientList() {
-  const { clients, lock, password, reloadClients } = useApp();
+  const { clients, lock, password, reloadClients, updateClient } = useApp();
   const { upcomingEvents, isCalendarConnected } = useCalendar();
   const [search, setSearch] = useState('');
   const [showSummary, setShowSummary] = useState(true);
@@ -304,17 +304,23 @@ export function ClientList() {
               </div>
               <div className={styles.summaryList}>
                 {unpaidSummary.clientsWithUnpaid.map(client => (
-                  <Link
-                    key={client.id}
-                    to={`/client/${client.id}`}
-                    className={styles.summaryItem}
-                  >
-                    <span className={styles.summaryName}>{client.name}</span>
-                    <span className={styles.summaryHours}>{client.unpaidHours}h</span>
-                    <span className={styles.summaryAmount}>
-                      ${((client.unpaidHours ?? 0) * (client.hourlyRate ?? 0)).toFixed(2)}
-                    </span>
-                  </Link>
+                  <div key={client.id} className={styles.summaryItem}>
+                    <Link to={`/client/${client.id}`} className={styles.summaryItemLink}>
+                      <span className={styles.summaryName}>{client.name}</span>
+                      <span className={styles.summaryHours}>{client.unpaidHours}h</span>
+                      <span className={styles.summaryAmount}>
+                        ${((client.unpaidHours ?? 0) * (client.hourlyRate ?? 0)).toFixed(2)}
+                      </span>
+                    </Link>
+                    <button
+                      type="button"
+                      className={styles.markPaidBtn}
+                      onClick={() => updateClient(client.id, { unpaidHours: 0 })}
+                      title="Mark as paid"
+                    >
+                      <Check size={14} />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
