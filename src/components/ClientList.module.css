@@ -411,6 +411,43 @@
   border-radius: var(--radius-full);
 }
 
+/* Calendar Sync Button */
+.calendarSyncBtn {
+  position: relative;
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  color: var(--color-text-tertiary);
+}
+
+.calendarSyncBtn:hover {
+  color: var(--color-text-secondary);
+}
+
+.calendarSyncBtn.connected {
+  color: var(--color-text-tertiary);
+}
+
+.calendarSyncBtn.connected:hover {
+  color: #3b82f6;
+}
+
+.calendarPlusIcon {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: var(--color-bg-card);
+  border-radius: 50%;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 /* Settings Button */
 .settingsBtn {
   padding: var(--space-sm);

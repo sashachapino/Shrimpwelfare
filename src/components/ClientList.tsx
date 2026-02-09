@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive, Settings, Download, Upload, X, Cloud, CheckCircle2, Check } from 'lucide-react';
+import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive, Settings, Download, Upload, X, Cloud, CheckCircle2, Check, RefreshCw } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useCalendar } from '../contexts/CalendarContext';
 import { AllianceIndicator } from './AllianceIndicator';
@@ -64,7 +64,7 @@ function ClientCard({ client }: { client: Client }) {
 
 export function ClientList() {
   const { clients, lock, password, reloadClients, updateClient } = useApp();
-  const { upcomingEvents, isCalendarConnected } = useCalendar();
+  const { upcomingEvents, isCalendarConnected, isLoading: calendarLoading, connectCalendar, refreshEvents } = useCalendar();
   const [search, setSearch] = useState('');
   const [showSummary, setShowSummary] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
@@ -186,6 +186,26 @@ export function ClientList() {
           )}
         </div>
         <div className={styles.actions}>
+          {!isCalendarConnected ? (
+            <button
+              onClick={connectCalendar}
+              className={`btn-ghost ${styles.calendarSyncBtn}`}
+              title="Connect Google Calendar"
+              disabled={calendarLoading}
+            >
+              <CalendarIcon size={18} />
+              <Plus size={12} className={styles.calendarPlusIcon} />
+            </button>
+          ) : (
+            <button
+              onClick={() => refreshEvents()}
+              className={`btn-ghost ${styles.calendarSyncBtn} ${styles.connected}`}
+              title="Refresh calendar"
+              disabled={calendarLoading}
+            >
+              <RefreshCw size={18} className={calendarLoading ? styles.spinning : ''} />
+            </button>
+          )}
           {archivedCount > 0 && (
             <Link to="/archived" className={`btn-ghost ${styles.archiveBtn}`} title="View archived clients">
               <Archive size={18} />

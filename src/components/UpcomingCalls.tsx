@@ -4,7 +4,6 @@ import {
   Calendar,
   Clock,
   ExternalLink,
-  CalendarX,
   RefreshCw,
   ChevronDown,
   ChevronUp,
@@ -54,7 +53,6 @@ export function UpcomingCalls({ collapsible = false }: UpcomingCallsProps) {
     isCalendarConnected,
     isLoading,
     upcomingEvents,
-    connectCalendar,
     disconnectCalendar,
     refreshEvents,
     getClientForEvent,
@@ -75,25 +73,9 @@ export function UpcomingCalls({ collapsible = false }: UpcomingCallsProps) {
     );
   }
 
+  // Don't show anything if calendar is not connected - sync button is in header
   if (!isCalendarConnected) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <h2>
-            <Calendar size={20} />
-            Upcoming Calls
-          </h2>
-        </div>
-        <div className={styles.connectPrompt}>
-          <CalendarX className={styles.promptIcon} />
-          <p>Connect your Google Calendar to see upcoming client calls</p>
-          <button onClick={connectCalendar} className="btn-accent">
-            <Calendar size={18} />
-            Connect Calendar
-          </button>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   const showContent = !collapsible || isExpanded;
