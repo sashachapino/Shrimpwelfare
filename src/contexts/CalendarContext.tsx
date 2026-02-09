@@ -13,10 +13,8 @@ import {
   signOut as googleSignOut,
   getUpcomingEvents,
   getPastEvents,
-  getSessionNotesEmails,
   getAllSessionNotesEmailsForClient,
   type CalendarEvent,
-  type SessionNotesEmail,
 } from '../utils/calendar';
 import { loadNotifications, saveNotifications } from '../utils/storage';
 import { useApp } from './AppContext';
@@ -146,78 +144,50 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       const past = await getPastEvents(pastHours, clientEmails);
       const dismissedIds = getDismissedIds();
 
-      // Fetch session notes emails (up to 30 days)
-      let sessionEmails: SessionNotesEmail[] = [];
-      try {
-        sessionEmails = await getSessionNotesEmails(pastHours);
-        console.log('Session emails found:', sessionEmails.length);
-        sessionEmails.forEach((e) => {
-          console.log('  Email:', e.subject, 'to:', e.to.join(', '), 'sent:', e.sentAt);
-        });
-      } catch (err) {
-        console.error('Error fetching session notes emails:', err);
-      }
+      // Build notifications from calendar events, fetching emails per-client
+      const calendarNotifications: PostCallNotification[] = [];
 
-      // Helper to find matching email for a client
-      const findEmailForClient = (clientEmail: string, eventEnd: Date): SessionNotesEmail | undefined => {
-        const clientEmailLower = clientEmail.toLowerCase();
-        // Find emails sent to this client within 7 days after the event ended
-        const oneWeekAfter = new Date(eventEnd.getTime() + 7 * 24 * 60 * 60 * 1000);
+      for (const event of past) {
+        if (dismissedIds.has(event.id)) continue;
 
-        const match = sessionEmails.find(
-          (email) =>
-            email.to.some((to) => to.toLowerCase() === clientEmailLower) &&
-            email.sentAt >= eventEnd &&
-            email.sentAt <= oneWeekAfter
-        );
+        const client = getClientForEvent(event);
+        if (!client?.id) continue;
 
-        if (!match) {
-          console.log('No email match for client:', clientEmailLower, 'event ended:', eventEnd);
-          // Log why each email didn't match
-          sessionEmails.forEach((email) => {
-            const toMatch = email.to.some((to) => to.toLowerCase() === clientEmailLower);
-            const afterEvent = email.sentAt >= eventEnd;
-            const beforeDeadline = email.sentAt <= oneWeekAfter;
-            if (email.to.some((to) => to.includes(clientEmailLower.split('@')[0]))) {
-              console.log('  Partial match:', email.subject, 'to:', email.to, 'toMatch:', toMatch, 'afterEvent:', afterEvent, 'beforeDeadline:', beforeDeadline);
-            }
-          });
+        const clientObj = clients.find((c) => c.id === client.id);
+        if (!clientObj?.email) continue;
+
+        // Search for session notes email specifically for this client
+        let emailBody: string | undefined;
+        try {
+          const emails = await getAllSessionNotesEmailsForClient(clientObj.email);
+          // Find email sent within 7 days after event
+          const oneWeekAfter = new Date(event.end.getTime() + 7 * 24 * 60 * 60 * 1000);
+          const matchingEmail = emails.find(
+            (e) => e.sentAt >= event.end && e.sentAt <= oneWeekAfter
+          );
+          emailBody = matchingEmail?.body;
+        } catch (err) {
+          console.error('Error fetching emails for client:', clientObj.email, err);
         }
 
-        return match;
-      };
+        // Calculate suggested hours from event duration
+        const durationMs = event.end.getTime() - event.start.getTime();
+        const durationHours = Math.round((durationMs / (1000 * 60 * 60)) * 2) / 2;
+        const suggestedHours = Math.max(0.5, Math.min(durationHours, 4));
 
-      // Build new notifications from calendar events
-      const calendarNotifications: PostCallNotification[] = past
-        .filter((event) => !dismissedIds.has(event.id))
-        .map((event) => {
-          const client = getClientForEvent(event);
-          const clientObj = clients.find((c) => c.id === client?.id);
-
-          // Find matching email
-          const matchedEmail = clientObj?.email
-            ? findEmailForClient(clientObj.email, event.end)
-            : undefined;
-
-          // Calculate suggested hours from event duration
-          const durationMs = event.end.getTime() - event.start.getTime();
-          const durationHours = Math.round((durationMs / (1000 * 60 * 60)) * 2) / 2;
-          const suggestedHours = Math.max(0.5, Math.min(durationHours, 4));
-
-          return {
-            id: event.id,
-            eventId: event.id,
-            clientId: client?.id || '',
-            clientName: client?.name || 'Unknown Client',
-            eventSummary: event.summary,
-            eventStart: event.start,
-            eventEnd: event.end,
-            dismissed: false,
-            sessionNotesEmail: matchedEmail?.body,
-            suggestedHours,
-          };
-        })
-        .filter((n) => n.clientId);
+        calendarNotifications.push({
+          id: event.id,
+          eventId: event.id,
+          clientId: client.id,
+          clientName: client.name,
+          eventSummary: event.summary,
+          eventStart: event.start,
+          eventEnd: event.end,
+          dismissed: false,
+          sessionNotesEmail: emailBody,
+          suggestedHours,
+        });
+      }
 
       // Merge with any persisted notifications that are still valid
       setNotifications((prev) => {
