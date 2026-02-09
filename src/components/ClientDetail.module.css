@@ -119,9 +119,62 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-xs);
-  width: 100%;
-  margin-top: var(--space-md);
   padding: var(--space-md);
+}
+
+.sessionActions {
+  display: flex;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.sessionActions .addSessionBtn {
+  flex: 1;
+  margin-top: 0;
+}
+
+.syncBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--text-sm);
+}
+
+.syncBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.syncResult {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.syncResult.success {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.syncResult.error {
+  background: #fef2f2;
+  color: var(--color-error);
 }
 
 .addSessionForm {

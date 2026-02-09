@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive, Settings, Download, Upload, X, Cloud, CheckCircle2, AlertCircle, Check } from 'lucide-react';
+import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive, Settings, Download, Upload, X, Cloud, CheckCircle2, Check } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useCalendar } from '../contexts/CalendarContext';
 import { AllianceIndicator } from './AllianceIndicator';
@@ -13,9 +13,6 @@ import type { Client } from '../types';
 import styles from './ClientList.module.css';
 
 function ClientCard({ client }: { client: Client }) {
-  // Check if there are fewer notes than sessions
-  const missingNotes = client.sessionsCompleted > (client.sessionNotes?.length ?? 0);
-
   return (
     <Link
       to={`/client/${client.id}`}
@@ -23,14 +20,7 @@ function ClientCard({ client }: { client: Client }) {
     >
       <div className={styles.clientMain}>
         <div className={styles.clientInfo}>
-          <h3 className={styles.clientName}>
-            {client.name}
-            {missingNotes && (
-              <span title="Missing session notes">
-                <AlertCircle size={16} className={styles.missingNotesIcon} />
-              </span>
-            )}
-          </h3>
+          <h3 className={styles.clientName}>{client.name}</h3>
           <div className={styles.clientMeta}>
             {client.email && (
               <span className={styles.metaItem}>

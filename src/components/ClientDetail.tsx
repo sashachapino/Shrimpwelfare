@@ -11,8 +11,10 @@ import {
   HelpCircle,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
 } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
+import { useCalendar } from '../contexts/CalendarContext';
 import { AllianceIndicator } from './AllianceIndicator';
 import { EnneagramIndicator } from './EnneagramIndicator';
 import { SessionNotes } from './SessionNotes';
@@ -40,6 +42,7 @@ export function ClientDetail() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { getClient, addClient, updateClient, deleteClient } = useApp();
+  const { isCalendarConnected, syncClientNotes } = useCalendar();
   const unpaidHoursRef = useRef<HTMLInputElement>(null);
 
   const isNew = id === 'new';
@@ -58,6 +61,8 @@ export function ClientDetail() {
   const [showAddSession, setShowAddSession] = useState(false);
   const [newSessionNumber, setNewSessionNumber] = useState(1);
   const [newSessionDate, setNewSessionDate] = useState(new Date().toISOString().split('T')[0]);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<{ message: string; isError: boolean } | null>(null);
 
   useEffect(() => {
     if (existingClient) {
@@ -157,6 +162,35 @@ export function ClientDetail() {
       sessionsCompleted: Math.max(0, prev.sessionsCompleted - 1),
       sessionNotes: prev.sessionNotes.filter((s) => s.id !== sessionId),
     }));
+  };
+
+  const handleSyncNotes = async () => {
+    if (!id || isNew) return;
+
+    setSyncing(true);
+    setSyncResult(null);
+
+    try {
+      const result = await syncClientNotes(id);
+      if (result.error) {
+        setSyncResult({ message: result.error, isError: true });
+      } else if (result.imported === 0) {
+        setSyncResult({ message: 'No new session notes found in email', isError: false });
+      } else {
+        setSyncResult({ message: `Imported ${result.imported} session note${result.imported > 1 ? 's' : ''} from email`, isError: false });
+        // Refresh the form data from the updated client
+        const updated = getClient(id);
+        if (updated) {
+          setFormData(updated);
+        }
+      }
+    } catch (err) {
+      setSyncResult({ message: 'Failed to sync notes', isError: true });
+    } finally {
+      setSyncing(false);
+      // Clear the message after 5 seconds
+      setTimeout(() => setSyncResult(null), 5000);
+    }
   };
 
   return (
@@ -373,17 +407,36 @@ export function ClientDetail() {
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  className={`btn-secondary ${styles.addSessionBtn}`}
-                  onClick={() => {
-                    setNewSessionNumber(formData.sessionsCompleted + 1);
-                    setShowAddSession(true);
-                  }}
-                >
-                  <Plus size={18} />
-                  Add Session
-                </button>
+                <div className={styles.sessionActions}>
+                  <button
+                    type="button"
+                    className={`btn-secondary ${styles.addSessionBtn}`}
+                    onClick={() => {
+                      setNewSessionNumber(formData.sessionsCompleted + 1);
+                      setShowAddSession(true);
+                    }}
+                  >
+                    <Plus size={18} />
+                    Add Session
+                  </button>
+                  {isCalendarConnected && !isNew && formData.email && (
+                    <button
+                      type="button"
+                      className={`btn-ghost ${styles.syncBtn}`}
+                      onClick={handleSyncNotes}
+                      disabled={syncing}
+                      title="Import session notes from emails"
+                    >
+                      <RefreshCw size={18} className={syncing ? styles.spinning : ''} />
+                      {syncing ? 'Syncing...' : 'Sync from Email'}
+                    </button>
+                  )}
+                </div>
+              )}
+              {syncResult && (
+                <div className={`${styles.syncResult} ${syncResult.isError ? styles.error : styles.success}`}>
+                  {syncResult.message}
+                </div>
               )}
             </div>
           )}

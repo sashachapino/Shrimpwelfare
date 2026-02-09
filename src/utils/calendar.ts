@@ -337,6 +337,94 @@ export async function getSessionNotesEmails(hoursBack: number = 24): Promise<Ses
   }
 }
 
+// Fetch all session notes emails sent to a specific client (up to 1 year back)
+export async function getAllSessionNotesEmailsForClient(clientEmail: string): Promise<SessionNotesEmail[]> {
+  if (!isSignedIn()) {
+    throw new Error('Not signed in to Google');
+  }
+
+  try {
+    // Query for sent emails with "session notes" in subject, sent to this client
+    // Look back up to 1 year
+    const afterDate = new Date();
+    afterDate.setFullYear(afterDate.getFullYear() - 1);
+    const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
+
+    const response = await gapi.client.gmail.users.messages.list({
+      userId: 'me',
+      q: `in:sent subject:"session notes" to:${clientEmail} after:${afterTimestamp}`,
+      maxResults: 100,
+    });
+
+    const messages = response.result.messages || [];
+    const emails: SessionNotesEmail[] = [];
+
+    for (const msg of messages) {
+      try {
+        const fullMessage = await gapi.client.gmail.users.messages.get({
+          userId: 'me',
+          id: msg.id!,
+          format: 'full',
+        });
+
+        const headers = fullMessage.result.payload?.headers || [];
+        const getHeader = (name: string) =>
+          headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
+
+        const subject = getHeader('Subject');
+        const toHeader = getHeader('To');
+        const dateHeader = getHeader('Date');
+
+        // Parse recipients
+        const toEmails = toHeader
+          .split(',')
+          .map((email: string) => {
+            const match = email.match(/<([^>]+)>/) || [null, email.trim()];
+            return match[1]?.toLowerCase() || '';
+          })
+          .filter(Boolean);
+
+        // Get email body
+        let body = '';
+        const payload = fullMessage.result.payload;
+
+        if (payload?.body?.data) {
+          body = decodeBase64Url(payload.body.data);
+        } else if (payload?.parts) {
+          const textPart = payload.parts.find((p) => p.mimeType === 'text/plain');
+          if (textPart?.body?.data) {
+            body = decodeBase64Url(textPart.body.data);
+          } else {
+            const htmlPart = payload.parts.find((p) => p.mimeType === 'text/html');
+            if (htmlPart?.body?.data) {
+              body = stripHtml(decodeBase64Url(htmlPart.body.data));
+            }
+          }
+        }
+
+        emails.push({
+          id: msg.id!,
+          threadId: msg.threadId!,
+          subject,
+          to: toEmails,
+          sentAt: new Date(dateHeader),
+          body: body.trim(),
+        });
+      } catch (err) {
+        console.error('Error fetching email details:', err);
+      }
+    }
+
+    // Sort by date, oldest first
+    emails.sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
+
+    return emails;
+  } catch (err) {
+    console.error('Error fetching all session notes emails for client:', err);
+    throw err;
+  }
+}
+
 // Decode base64url encoded string
 function decodeBase64Url(data: string): string {
   const base64 = data.replace(/-/g, '+').replace(/_/g, '/');

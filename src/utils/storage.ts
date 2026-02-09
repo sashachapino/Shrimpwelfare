@@ -1,6 +1,12 @@
 // Secure local storage using IndexedDB with encryption
-import type { Client, EncryptedStore } from '../types';
+import type { Client, EncryptedStore, PostCallNotification } from '../types';
 import { encrypt, decrypt, hashPassword } from './crypto';
+
+// Serialized version of PostCallNotification (dates as strings)
+interface SerializedNotification extends Omit<PostCallNotification, 'eventStart' | 'eventEnd'> {
+  eventStart: string;
+  eventEnd: string;
+}
 
 const DB_NAME = 'coaching-crm';
 const DB_VERSION = 1;
@@ -8,6 +14,7 @@ const STORE_NAME = 'encrypted-data';
 const PASSWORD_HASH_KEY = 'password-hash';
 const DATA_KEY = 'clients-data';
 const SETTINGS_KEY = 'settings-data';
+const NOTIFICATIONS_KEY = 'notifications-data';
 
 export interface AppSettings {
   anthropicApiKey?: string;
@@ -152,6 +159,50 @@ export async function saveSettings(settings: AppSettings, password: string): Pro
   };
 
   await setValue(SETTINGS_KEY, encrypted);
+}
+
+// Notification persistence functions
+export async function loadNotifications(password: string): Promise<PostCallNotification[]> {
+  const encrypted = await getValue<EncryptedStore>(NOTIFICATIONS_KEY);
+  if (!encrypted) return [];
+
+  try {
+    const decrypted = await decrypt(
+      encrypted.data,
+      password,
+      encrypted.iv,
+      encrypted.salt
+    );
+    const serialized = JSON.parse(decrypted) as SerializedNotification[];
+    // Convert date strings back to Date objects
+    return serialized.map(n => ({
+      ...n,
+      eventStart: new Date(n.eventStart),
+      eventEnd: new Date(n.eventEnd),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function saveNotifications(notifications: PostCallNotification[], password: string): Promise<void> {
+  // Convert Date objects to strings for serialization
+  const serialized: SerializedNotification[] = notifications.map(n => ({
+    ...n,
+    eventStart: n.eventStart.toISOString(),
+    eventEnd: n.eventEnd.toISOString(),
+  }));
+
+  const data = JSON.stringify(serialized);
+  const { iv, salt, ciphertext } = await encrypt(data, password);
+
+  const encrypted: EncryptedStore = {
+    iv,
+    salt,
+    data: ciphertext,
+  };
+
+  await setValue(NOTIFICATIONS_KEY, encrypted);
 }
 
 // Encrypted backup functions - exports data in encrypted form (safe for cloud storage)
