@@ -33,6 +33,88 @@ export interface SessionNotesEmail {
   body: string;
 }
 
+// Interface for email parts (used for recursive body extraction)
+interface EmailPart {
+  mimeType?: string;
+  body?: { data?: string };
+  parts?: EmailPart[];
+}
+
+// Decode base64url encoded string
+function decodeBase64Url(data: string): string {
+  const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+  try {
+    return decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+  } catch {
+    return atob(base64);
+  }
+}
+
+// Strip HTML tags from string
+function stripHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || '';
+}
+
+// Recursively extract body from email parts (handles nested multipart messages)
+function extractEmailBody(payload: EmailPart | undefined, stripHtmlFn: (html: string) => string): string {
+  if (!payload) return '';
+
+  // If there's direct body data on this payload
+  if (payload.body?.data) {
+    const decoded = decodeBase64Url(payload.body.data);
+    // If this is HTML, strip tags
+    if (payload.mimeType === 'text/html') {
+      return stripHtmlFn(decoded);
+    }
+    return decoded;
+  }
+
+  // If there are parts, search recursively
+  if (payload.parts && payload.parts.length > 0) {
+    // First, try to find text/plain at any level
+    const findTextPlain = (parts: EmailPart[]): string | null => {
+      for (const part of parts) {
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+          return decodeBase64Url(part.body.data);
+        }
+        if (part.parts) {
+          const nested = findTextPlain(part.parts);
+          if (nested) return nested;
+        }
+      }
+      return null;
+    };
+
+    const textPlain = findTextPlain(payload.parts);
+    if (textPlain) return textPlain;
+
+    // If no text/plain, try text/html
+    const findTextHtml = (parts: EmailPart[]): string | null => {
+      for (const part of parts) {
+        if (part.mimeType === 'text/html' && part.body?.data) {
+          return stripHtmlFn(decodeBase64Url(part.body.data));
+        }
+        if (part.parts) {
+          const nested = findTextHtml(part.parts);
+          if (nested) return nested;
+        }
+      }
+      return null;
+    };
+
+    const textHtml = findTextHtml(payload.parts);
+    if (textHtml) return textHtml;
+  }
+
+  return '';
+}
+
 // Load the Google API client library
 export async function loadGoogleApi(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -303,25 +385,8 @@ export async function getSessionNotesEmails(hoursBack: number = 24): Promise<Ses
           })
           .filter(Boolean);
 
-        // Get email body
-        let body = '';
-        const payload = fullMessage.result.payload;
-
-        if (payload?.body?.data) {
-          body = decodeBase64Url(payload.body.data);
-        } else if (payload?.parts) {
-          // Look for text/plain part
-          const textPart = payload.parts.find((p) => p.mimeType === 'text/plain');
-          if (textPart?.body?.data) {
-            body = decodeBase64Url(textPart.body.data);
-          } else {
-            // Try text/html and strip tags
-            const htmlPart = payload.parts.find((p) => p.mimeType === 'text/html');
-            if (htmlPart?.body?.data) {
-              body = stripHtml(decodeBase64Url(htmlPart.body.data));
-            }
-          }
-        }
+        // Get email body using recursive extraction for nested multipart messages
+        const body = extractEmailBody(fullMessage.result.payload as EmailPart, stripHtml);
 
         emails.push({
           id: msg.id!,
@@ -373,8 +438,10 @@ export async function getAllSessionNotesEmailsForClient(clientEmail: string): Pr
     const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
 
     // Use a simpler query that's more likely to match
-    const query = `from:me subject:session subject:notes to:${clientEmail} after:${afterTimestamp}`;
+    // Quote the email to handle special characters like @ properly in Gmail search
+    const query = `from:me subject:session subject:notes to:"${clientEmail}" after:${afterTimestamp}`;
     console.log('Gmail search query:', query);
+    console.log('Client email:', clientEmail);
 
     const response = await gapi.client.gmail.users.messages.list({
       userId: 'me',
@@ -412,23 +479,16 @@ export async function getAllSessionNotesEmailsForClient(clientEmail: string): Pr
           })
           .filter(Boolean);
 
-        // Get email body
-        let body = '';
-        const payload = fullMessage.result.payload;
+        // Get email body using recursive extraction for nested multipart messages
+        const body = extractEmailBody(fullMessage.result.payload as EmailPart, stripHtml);
 
-        if (payload?.body?.data) {
-          body = decodeBase64Url(payload.body.data);
-        } else if (payload?.parts) {
-          const textPart = payload.parts.find((p) => p.mimeType === 'text/plain');
-          if (textPart?.body?.data) {
-            body = decodeBase64Url(textPart.body.data);
-          } else {
-            const htmlPart = payload.parts.find((p) => p.mimeType === 'text/html');
-            if (htmlPart?.body?.data) {
-              body = stripHtml(decodeBase64Url(htmlPart.body.data));
-            }
-          }
-        }
+        console.log('Email found:', {
+          subject,
+          to: toEmails,
+          date: dateHeader,
+          bodyLength: body.length,
+          bodyPreview: body.slice(0, 100),
+        });
 
         emails.push({
           id: msg.id!,
@@ -474,25 +534,4 @@ export async function getAllSessionNotesEmailsForClient(clientEmail: string): Pr
     }
     throw new Error('Failed to fetch emails from Gmail');
   }
-}
-
-// Decode base64url encoded string
-function decodeBase64Url(data: string): string {
-  const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
-  try {
-    return decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-  } catch {
-    return atob(base64);
-  }
-}
-
-// Strip HTML tags from string
-function stripHtml(html: string): string {
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  return doc.body.textContent || '';
 }
