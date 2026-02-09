@@ -1,6 +1,11 @@
+/// <reference types="@maxim_mazurok/gapi.client.gmail-v1" />
+
 const CLIENT_ID = '977606447321-mt672r86crrrhfi27uh7cut96mraoo9v.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
-const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest';
+const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly';
+const DISCOVERY_DOCS = [
+  'https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest',
+  'https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest'
+];
 
 let tokenClient: google.accounts.oauth2.TokenClient | null = null;
 let gapiInited = false;
@@ -19,6 +24,15 @@ export interface CalendarEvent {
   htmlLink: string;
 }
 
+export interface SessionNotesEmail {
+  id: string;
+  threadId: string;
+  subject: string;
+  to: string[];
+  sentAt: Date;
+  body: string;
+}
+
 // Load the Google API client library
 export async function loadGoogleApi(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -31,7 +45,7 @@ export async function loadGoogleApi(): Promise<void> {
       gapi.load('client', async () => {
         try {
           await gapi.client.init({
-            discoveryDocs: [DISCOVERY_DOC],
+            discoveryDocs: DISCOVERY_DOCS,
           });
           gapiInited = true;
           maybeEnableAuth();
@@ -235,4 +249,111 @@ export async function getPastEvents(
     console.error('Error fetching past events:', err);
     throw err;
   }
+}
+
+// Fetch sent emails with "session notes" in subject from the last 24 hours
+export async function getSessionNotesEmails(hoursBack: number = 24): Promise<SessionNotesEmail[]> {
+  if (!isSignedIn()) {
+    throw new Error('Not signed in to Google');
+  }
+
+  try {
+    // Query for sent emails with "session notes" in subject
+    const afterDate = new Date();
+    afterDate.setHours(afterDate.getHours() - hoursBack);
+    const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
+
+    const response = await gapi.client.gmail.users.messages.list({
+      userId: 'me',
+      q: `in:sent subject:"session notes" after:${afterTimestamp}`,
+      maxResults: 20,
+    });
+
+    const messages = response.result.messages || [];
+    const emails: SessionNotesEmail[] = [];
+
+    for (const msg of messages) {
+      try {
+        const fullMessage = await gapi.client.gmail.users.messages.get({
+          userId: 'me',
+          id: msg.id!,
+          format: 'full',
+        });
+
+        const headers = fullMessage.result.payload?.headers || [];
+        const getHeader = (name: string) =>
+          headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
+
+        const subject = getHeader('Subject');
+        const toHeader = getHeader('To');
+        const dateHeader = getHeader('Date');
+
+        // Parse recipients
+        const toEmails = toHeader
+          .split(',')
+          .map((email: string) => {
+            const match = email.match(/<([^>]+)>/) || [null, email.trim()];
+            return match[1]?.toLowerCase() || '';
+          })
+          .filter(Boolean);
+
+        // Get email body
+        let body = '';
+        const payload = fullMessage.result.payload;
+
+        if (payload?.body?.data) {
+          body = decodeBase64Url(payload.body.data);
+        } else if (payload?.parts) {
+          // Look for text/plain part
+          const textPart = payload.parts.find((p) => p.mimeType === 'text/plain');
+          if (textPart?.body?.data) {
+            body = decodeBase64Url(textPart.body.data);
+          } else {
+            // Try text/html and strip tags
+            const htmlPart = payload.parts.find((p) => p.mimeType === 'text/html');
+            if (htmlPart?.body?.data) {
+              body = stripHtml(decodeBase64Url(htmlPart.body.data));
+            }
+          }
+        }
+
+        emails.push({
+          id: msg.id!,
+          threadId: msg.threadId!,
+          subject,
+          to: toEmails,
+          sentAt: new Date(dateHeader),
+          body: body.trim(),
+        });
+      } catch (err) {
+        console.error('Error fetching email details:', err);
+      }
+    }
+
+    return emails;
+  } catch (err) {
+    console.error('Error fetching session notes emails:', err);
+    throw err;
+  }
+}
+
+// Decode base64url encoded string
+function decodeBase64Url(data: string): string {
+  const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+  try {
+    return decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+  } catch {
+    return atob(base64);
+  }
+}
+
+// Strip HTML tags from string
+function stripHtml(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || '';
 }

@@ -17,6 +17,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@maxim_mazurok/gapi.client.gmail-v1": "^0.1.20260202",
+    "@types/gapi.client.gmail-v1": "^0.0.4",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",

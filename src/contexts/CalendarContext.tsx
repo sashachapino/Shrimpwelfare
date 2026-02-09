@@ -13,7 +13,9 @@ import {
   signOut as googleSignOut,
   getUpcomingEvents,
   getPastEvents,
+  getSessionNotesEmails,
   type CalendarEvent,
+  type SessionNotesEmail,
 } from '../utils/calendar';
 import { useApp } from './AppContext';
 import type { PostCallNotification } from '../types';
@@ -27,6 +29,7 @@ interface CalendarContextType {
   disconnectCalendar: () => void;
   refreshEvents: () => Promise<void>;
   dismissNotification: (notificationId: string) => void;
+  confirmSessionNotes: (notificationId: string, notes: string, hours: number) => Promise<void>;
   getClientForEvent: (event: CalendarEvent) => { id: string; name: string } | null;
 }
 
@@ -35,7 +38,7 @@ const CalendarContext = createContext<CalendarContextType | null>(null);
 const DISMISSED_NOTIFICATIONS_KEY = 'dismissed_notifications';
 
 export function CalendarProvider({ children }: { children: ReactNode }) {
-  const { clients, isUnlocked } = useApp();
+  const { clients, isUnlocked, updateClient, getClient } = useApp();
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [apiLoaded, setApiLoaded] = useState(false);
@@ -113,18 +116,55 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       const past = await getPastEvents(48, clientEmails);
       const dismissedIds = getDismissedIds();
 
+      // Fetch session notes emails
+      let sessionEmails: SessionNotesEmail[] = [];
+      try {
+        sessionEmails = await getSessionNotesEmails(48);
+      } catch (err) {
+        console.error('Error fetching session notes emails:', err);
+        // Continue without emails - don't block notifications
+      }
+
+      // Helper to find matching email for a client
+      const findEmailForClient = (clientEmail: string, eventEnd: Date): SessionNotesEmail | undefined => {
+        const clientEmailLower = clientEmail.toLowerCase();
+        // Find emails sent to this client within 2 hours after the event ended
+        const twoHoursAfter = new Date(eventEnd.getTime() + 2 * 60 * 60 * 1000);
+        return sessionEmails.find(
+          (email) =>
+            email.to.some((to) => to.toLowerCase() === clientEmailLower) &&
+            email.sentAt >= eventEnd &&
+            email.sentAt <= twoHoursAfter
+        );
+      };
+
       const newNotifications: PostCallNotification[] = past
         .filter((event) => !dismissedIds.has(event.id))
         .map((event) => {
           const client = getClientForEvent(event);
+          const clientObj = clients.find((c) => c.id === client?.id);
+
+          // Find matching email
+          const matchedEmail = clientObj?.email
+            ? findEmailForClient(clientObj.email, event.end)
+            : undefined;
+
+          // Calculate suggested hours from event duration
+          const durationMs = event.end.getTime() - event.start.getTime();
+          const durationHours = Math.round((durationMs / (1000 * 60 * 60)) * 2) / 2; // Round to nearest 0.5
+          const suggestedHours = Math.max(0.5, Math.min(durationHours, 4)); // Clamp between 0.5 and 4
+
           return {
             id: event.id,
             eventId: event.id,
             clientId: client?.id || '',
             clientName: client?.name || 'Unknown Client',
             eventSummary: event.summary,
+            eventStart: event.start,
             eventEnd: event.end,
             dismissed: false,
+            sessionNotesEmail: matchedEmail?.body,
+            suggestedHours,
           };
         })
         .filter((n) => n.clientId); // Only include if we found a matching client
@@ -167,6 +207,38 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     [getDismissedIds, saveDismissedIds]
   );
 
+  // Confirm session notes and add to client
+  const confirmSessionNotes = useCallback(
+    async (notificationId: string, notes: string, hours: number) => {
+      const notification = notifications.find((n) => n.id === notificationId);
+      if (!notification) return;
+
+      const client = getClient(notification.clientId);
+      if (!client) return;
+
+      // Create new session note
+      const newSession = {
+        id: crypto.randomUUID(),
+        sessionNumber: client.sessionsCompleted + 1,
+        date: notification.eventStart.toISOString().split('T')[0],
+        notes: notes.trim(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Update client with new session and unpaid hours
+      await updateClient(notification.clientId, {
+        sessionsCompleted: client.sessionsCompleted + 1,
+        unpaidHours: (client.unpaidHours ?? 0) + hours,
+        sessionNotes: [...client.sessionNotes, newSession],
+      });
+
+      // Dismiss the notification
+      dismissNotification(notificationId);
+    },
+    [notifications, getClient, updateClient, dismissNotification]
+  );
+
   return (
     <CalendarContext.Provider
       value={{
@@ -178,6 +250,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         disconnectCalendar,
         refreshEvents,
         dismissNotification,
+        confirmSessionNotes,
         getClientForEvent,
       }}
     >

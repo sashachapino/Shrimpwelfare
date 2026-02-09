@@ -59,6 +59,10 @@ export interface PostCallNotification {
   clientId: string;
   clientName: string;
   eventSummary: string;
+  eventStart: Date;
   eventEnd: Date;
   dismissed: boolean;
+  // Gmail integration fields
+  sessionNotesEmail?: string; // Email body if found
+  suggestedHours: number; // Calculated from event duration, default 1
 }
