@@ -336,7 +336,18 @@ export async function getSessionNotesEmails(hoursBack: number = 24): Promise<Ses
       }
     }
 
-    return emails;
+    // Sort by date, oldest first, then deduplicate by thread
+    emails.sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
+    const seenThreads = new Set<string>();
+    const uniqueEmails = emails.filter((email) => {
+      if (seenThreads.has(email.threadId)) {
+        return false;
+      }
+      seenThreads.add(email.threadId);
+      return true;
+    });
+
+    return uniqueEmails;
   } catch (err) {
     console.error('Error fetching session notes emails:', err);
     throw err;
@@ -435,7 +446,20 @@ export async function getAllSessionNotesEmailsForClient(clientEmail: string): Pr
     // Sort by date, oldest first
     emails.sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
 
-    return emails;
+    // Deduplicate by thread - keep only the first (oldest) email from each thread
+    // This filters out replies to session notes emails
+    const seenThreads = new Set<string>();
+    const uniqueEmails = emails.filter((email) => {
+      if (seenThreads.has(email.threadId)) {
+        return false;
+      }
+      seenThreads.add(email.threadId);
+      return true;
+    });
+
+    console.log('After deduplication:', uniqueEmails.length, 'unique threads');
+
+    return uniqueEmails;
   } catch (err: unknown) {
     console.error('Error fetching all session notes emails for client:', err);
     // Provide more useful error messages
