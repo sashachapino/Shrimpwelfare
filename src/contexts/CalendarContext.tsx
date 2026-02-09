@@ -214,6 +214,18 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     [getDismissedIds, saveDismissedIds]
   );
 
+  // Helper to check if content is a duplicate (looks for 30+ char matching substring)
+  const isDuplicateContent = (newContent: string, existingNotes: SessionNote[]): boolean => {
+    const newText = newContent.trim();
+    if (newText.length < 30) return false;
+
+    // Extract a chunk from the middle of the new content (skip boilerplate at start)
+    const startPos = Math.min(50, Math.floor(newText.length / 4));
+    const chunk = newText.slice(startPos, startPos + 30);
+
+    return existingNotes.some((note) => note.notes.includes(chunk));
+  };
+
   // Confirm session notes and add to client
   const confirmSessionNotes = useCallback(
     async (notificationId: string, notes: string, hours: number) => {
@@ -223,21 +235,36 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       const client = getClient(notification.clientId);
       if (!client) return;
 
+      // Check if this is a duplicate
+      if (isDuplicateContent(notes, client.sessionNotes)) {
+        // Just dismiss without adding
+        dismissNotification(notificationId);
+        return;
+      }
+
       // Create new session note
-      const newSession = {
+      const newSession: SessionNote = {
         id: crypto.randomUUID(),
-        sessionNumber: client.sessionsCompleted + 1,
+        sessionNumber: 0, // Will be renumbered
         date: notification.eventStart.toISOString().split('T')[0],
         notes: notes.trim(),
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
+      // Combine all notes, sort by date, and renumber sequentially
+      const allNotes = [...client.sessionNotes, newSession]
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .map((note, index) => ({
+          ...note,
+          sessionNumber: index + 1,
+        }));
+
       // Update client with new session and unpaid hours
       await updateClient(notification.clientId, {
-        sessionsCompleted: client.sessionsCompleted + 1,
+        sessionsCompleted: allNotes.length,
         unpaidHours: (client.unpaidHours ?? 0) + hours,
-        sessionNotes: [...client.sessionNotes, newSession],
+        sessionNotes: allNotes,
       });
 
       // Dismiss the notification
@@ -266,41 +293,32 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
           return { imported: 0 };
         }
 
-        // Get existing session note dates to avoid duplicates
-        const existingDates = new Set(
-          client.sessionNotes.map((n) => n.date)
-        );
-
-        // Filter out emails that would be duplicates
+        // Filter out duplicate emails by checking content similarity
         const newEmails = emails.filter((email) => {
-          const dateStr = email.sentAt.toISOString().split('T')[0];
-          return !existingDates.has(dateStr);
+          return !isDuplicateContent(email.body, client.sessionNotes);
         });
 
         if (newEmails.length === 0) {
           return { imported: 0 };
         }
 
-        // Create session notes from emails
-        const newNotes: SessionNote[] = newEmails.map((email, index) => ({
+        // Create session notes from emails (temporary session numbers)
+        const newNotes: SessionNote[] = newEmails.map((email) => ({
           id: crypto.randomUUID(),
-          sessionNumber: client.sessionsCompleted + index + 1,
+          sessionNumber: 0, // Will be renumbered
           date: email.sentAt.toISOString().split('T')[0],
           notes: email.body.trim(),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }));
 
-        // Sort by date
-        newNotes.sort((a, b) => a.date.localeCompare(b.date));
-
-        // Renumber all session notes
-        const allNotes = [...client.sessionNotes, ...newNotes].sort(
-          (a, b) => a.date.localeCompare(b.date)
-        );
-        allNotes.forEach((note, index) => {
-          note.sessionNumber = index + 1;
-        });
+        // Combine all notes, sort by date, and renumber sequentially
+        const allNotes = [...client.sessionNotes, ...newNotes]
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .map((note, index) => ({
+            ...note,
+            sessionNumber: index + 1,
+          }));
 
         // Update client
         await updateClient(clientId, {
