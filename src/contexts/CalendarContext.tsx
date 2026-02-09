@@ -16,7 +16,6 @@ import {
   getAllSessionNotesEmailsForClient,
   type CalendarEvent,
 } from '../utils/calendar';
-import { loadNotifications, saveNotifications } from '../utils/storage';
 import { useApp } from './AppContext';
 import type { PostCallNotification, SessionNote } from '../types';
 
@@ -40,7 +39,7 @@ const DISMISSED_NOTIFICATIONS_KEY = 'dismissed_notifications';
 const PAST_EVENTS_DAYS = 30; // Look back 30 days for notifications
 
 export function CalendarProvider({ children }: { children: ReactNode }) {
-  const { clients, isUnlocked, updateClient, getClient, password } = useApp();
+  const { clients, isUnlocked, updateClient, getClient } = useApp();
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [apiLoaded, setApiLoaded] = useState(false);
@@ -94,32 +93,6 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         setIsLoading(false);
       });
   }, [isUnlocked]);
-
-  // Load persisted notifications on startup
-  useEffect(() => {
-    if (!isUnlocked || !password) return;
-
-    loadNotifications(password).then((persisted) => {
-      if (persisted.length > 0) {
-        setNotifications(persisted);
-      }
-    }).catch((err) => {
-      console.error('Error loading persisted notifications:', err);
-    });
-  }, [isUnlocked, password]);
-
-  // Save notifications when they change
-  const persistNotifications = useCallback(
-    async (notifs: PostCallNotification[]) => {
-      if (!password) return;
-      try {
-        await saveNotifications(notifs, password);
-      } catch (err) {
-        console.error('Error saving notifications:', err);
-      }
-    },
-    [password]
-  );
 
   // Fetch events when connected
   const refreshEvents = useCallback(async () => {
@@ -189,23 +162,11 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         });
       }
 
-      // Merge with any persisted notifications that are still valid
-      setNotifications((prev) => {
-        // Create a map of new notification IDs
-        const newIds = new Set(calendarNotifications.map((n) => n.id));
-        // Keep persisted notifications that aren't in the new set and aren't dismissed
-        const persistedStillValid = prev.filter(
-          (p) => !newIds.has(p.id) && !dismissedIds.has(p.id)
-        );
-        const merged = [...calendarNotifications, ...persistedStillValid];
-        // Save merged notifications
-        persistNotifications(merged);
-        return merged;
-      });
+      setNotifications(calendarNotifications);
     } catch (err) {
       console.error('Error refreshing events:', err);
     }
-  }, [isCalendarConnected, apiLoaded, clients, getDismissedIds, getClientForEvent, persistNotifications]);
+  }, [isCalendarConnected, apiLoaded, clients, getDismissedIds, getClientForEvent]);
 
   // Auto-refresh events
   useEffect(() => {
@@ -234,13 +195,9 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       const dismissedIds = getDismissedIds();
       dismissedIds.add(notificationId);
       saveDismissedIds(dismissedIds);
-      setNotifications((prev) => {
-        const updated = prev.filter((n) => n.id !== notificationId);
-        persistNotifications(updated);
-        return updated;
-      });
+      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
     },
-    [getDismissedIds, saveDismissedIds, persistNotifications]
+    [getDismissedIds, saveDismissedIds]
   );
 
   // Confirm session notes and add to client
