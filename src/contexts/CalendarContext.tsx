@@ -214,16 +214,28 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
     [getDismissedIds, saveDismissedIds]
   );
 
-  // Helper to check if content is a duplicate (looks for 30+ char matching substring)
+  // Helper to normalize text for comparison (strip formatting, keep only letters/numbers/spaces)
+  const normalizeText = (text: string): string => {
+    return text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, '') // Remove everything except letters, numbers, spaces
+      .replace(/\s+/g, ' ')        // Collapse multiple spaces
+      .trim();
+  };
+
+  // Helper to check if content is a duplicate (compares normalized text)
   const isDuplicateContent = (newContent: string, existingNotes: SessionNote[]): boolean => {
-    const newText = newContent.trim();
-    if (newText.length < 30) return false;
+    const normalizedNew = normalizeText(newContent);
+    if (normalizedNew.length < 50) return false;
 
-    // Extract a chunk from the middle of the new content (skip boilerplate at start)
-    const startPos = Math.min(50, Math.floor(newText.length / 4));
-    const chunk = newText.slice(startPos, startPos + 30);
+    // Extract a chunk from well into the content (skip headers/boilerplate)
+    const startPos = Math.min(100, Math.floor(normalizedNew.length / 3));
+    const chunk = normalizedNew.slice(startPos, startPos + 50);
 
-    return existingNotes.some((note) => note.notes.includes(chunk));
+    return existingNotes.some((note) => {
+      const normalizedExisting = normalizeText(note.notes);
+      return normalizedExisting.includes(chunk);
+    });
   };
 
   // Confirm session notes and add to client
