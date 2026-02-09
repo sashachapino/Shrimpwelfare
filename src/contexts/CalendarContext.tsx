@@ -157,13 +157,13 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       // Helper to find matching email for a client
       const findEmailForClient = (clientEmail: string, eventEnd: Date): SessionNotesEmail | undefined => {
         const clientEmailLower = clientEmail.toLowerCase();
-        // Find emails sent to this client within 2 hours after the event ended
-        const twoHoursAfter = new Date(eventEnd.getTime() + 2 * 60 * 60 * 1000);
+        // Find emails sent to this client within 24 hours after the event ended
+        const oneDayAfter = new Date(eventEnd.getTime() + 24 * 60 * 60 * 1000);
         return sessionEmails.find(
           (email) =>
             email.to.some((to) => to.toLowerCase() === clientEmailLower) &&
             email.sentAt >= eventEnd &&
-            email.sentAt <= twoHoursAfter
+            email.sentAt <= oneDayAfter
         );
       };
 

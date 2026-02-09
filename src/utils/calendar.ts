@@ -265,8 +265,8 @@ export async function getSessionNotesEmails(hoursBack: number = 24): Promise<Ses
 
     const response = await gapi.client.gmail.users.messages.list({
       userId: 'me',
-      q: `in:sent subject:"session notes" after:${afterTimestamp}`,
-      maxResults: 20,
+      q: `from:me subject:"session notes" after:${afterTimestamp}`,
+      maxResults: 50,
     });
 
     const messages = response.result.messages || [];
@@ -352,7 +352,7 @@ export async function getAllSessionNotesEmailsForClient(clientEmail: string): Pr
 
     const response = await gapi.client.gmail.users.messages.list({
       userId: 'me',
-      q: `in:sent subject:"session notes" to:${clientEmail} after:${afterTimestamp}`,
+      q: `from:me subject:"session notes" to:${clientEmail} after:${afterTimestamp}`,
       maxResults: 100,
     });
 
