@@ -50,13 +50,16 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
   const getDismissedIds = useCallback((): Set<string> => {
     try {
       const stored = localStorage.getItem(DISMISSED_NOTIFICATIONS_KEY);
-      return stored ? new Set(JSON.parse(stored)) : new Set();
+      const ids = stored ? new Set<string>(JSON.parse(stored)) : new Set<string>();
+      console.log('Loaded dismissed IDs:', ids.size, 'items');
+      return ids;
     } catch {
       return new Set();
     }
   }, []);
 
   const saveDismissedIds = useCallback((ids: Set<string>) => {
+    console.log('Saving dismissed IDs:', ids.size, 'items');
     localStorage.setItem(DISMISSED_NOTIFICATIONS_KEY, JSON.stringify([...ids]));
   }, []);
 
@@ -117,11 +120,18 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       const past = await getPastEvents(pastHours, clientEmails);
       const dismissedIds = getDismissedIds();
 
+      console.log('Past events found:', past.length);
+      console.log('Dismissed IDs count:', dismissedIds.size);
+
       // Build notifications from calendar events, fetching emails per-client
       const calendarNotifications: PostCallNotification[] = [];
+      let skippedDismissed = 0;
 
       for (const event of past) {
-        if (dismissedIds.has(event.id)) continue;
+        if (dismissedIds.has(event.id)) {
+          skippedDismissed++;
+          continue;
+        }
 
         const client = getClientForEvent(event);
         if (!client?.id) continue;
@@ -162,6 +172,9 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         });
       }
 
+      console.log('Skipped (dismissed):', skippedDismissed);
+      console.log('Notifications to show:', calendarNotifications.length);
+
       setNotifications(calendarNotifications);
     } catch (err) {
       console.error('Error refreshing events:', err);
@@ -192,6 +205,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
 
   const dismissNotification = useCallback(
     (notificationId: string) => {
+      console.log('Dismissing notification:', notificationId);
       const dismissedIds = getDismissedIds();
       dismissedIds.add(notificationId);
       saveDismissedIds(dismissedIds);
