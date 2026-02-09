@@ -150,6 +150,10 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
       let sessionEmails: SessionNotesEmail[] = [];
       try {
         sessionEmails = await getSessionNotesEmails(pastHours);
+        console.log('Session emails found:', sessionEmails.length);
+        sessionEmails.forEach((e) => {
+          console.log('  Email:', e.subject, 'to:', e.to.join(', '), 'sent:', e.sentAt);
+        });
       } catch (err) {
         console.error('Error fetching session notes emails:', err);
       }
@@ -159,12 +163,28 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         const clientEmailLower = clientEmail.toLowerCase();
         // Find emails sent to this client within 7 days after the event ended
         const oneWeekAfter = new Date(eventEnd.getTime() + 7 * 24 * 60 * 60 * 1000);
-        return sessionEmails.find(
+
+        const match = sessionEmails.find(
           (email) =>
             email.to.some((to) => to.toLowerCase() === clientEmailLower) &&
             email.sentAt >= eventEnd &&
             email.sentAt <= oneWeekAfter
         );
+
+        if (!match) {
+          console.log('No email match for client:', clientEmailLower, 'event ended:', eventEnd);
+          // Log why each email didn't match
+          sessionEmails.forEach((email) => {
+            const toMatch = email.to.some((to) => to.toLowerCase() === clientEmailLower);
+            const afterEvent = email.sentAt >= eventEnd;
+            const beforeDeadline = email.sentAt <= oneWeekAfter;
+            if (email.to.some((to) => to.includes(clientEmailLower.split('@')[0]))) {
+              console.log('  Partial match:', email.subject, 'to:', email.to, 'toMatch:', toMatch, 'afterEvent:', afterEvent, 'beforeDeadline:', beforeDeadline);
+            }
+          });
+        }
+
+        return match;
       };
 
       // Build new notifications from calendar events
