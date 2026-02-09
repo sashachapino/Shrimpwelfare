@@ -251,10 +251,16 @@ export async function getPastEvents(
   }
 }
 
-// Fetch sent emails with "session notes" in subject from the last 24 hours
+// Fetch sent emails with "session notes" in subject from the last N hours
 export async function getSessionNotesEmails(hoursBack: number = 24): Promise<SessionNotesEmail[]> {
   if (!isSignedIn()) {
     throw new Error('Not signed in to Google');
+  }
+
+  // Check if Gmail API is available
+  if (!gapi.client.gmail) {
+    console.warn('Gmail API not loaded, skipping email fetch');
+    return [];
   }
 
   try {
@@ -265,7 +271,7 @@ export async function getSessionNotesEmails(hoursBack: number = 24): Promise<Ses
 
     const response = await gapi.client.gmail.users.messages.list({
       userId: 'me',
-      q: `from:me subject:"session notes" after:${afterTimestamp}`,
+      q: `from:me subject:session subject:notes after:${afterTimestamp}`,
       maxResults: 50,
     });
 
@@ -343,6 +349,11 @@ export async function getAllSessionNotesEmailsForClient(clientEmail: string): Pr
     throw new Error('Not signed in to Google');
   }
 
+  // Check if Gmail API is available
+  if (!gapi.client.gmail) {
+    throw new Error('Gmail API not loaded. Please reconnect your Google account.');
+  }
+
   try {
     // Query for sent emails with "session notes" in subject, sent to this client
     // Look back up to 1 year
@@ -350,11 +361,17 @@ export async function getAllSessionNotesEmailsForClient(clientEmail: string): Pr
     afterDate.setFullYear(afterDate.getFullYear() - 1);
     const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
 
+    // Use a simpler query that's more likely to match
+    const query = `from:me subject:session subject:notes to:${clientEmail} after:${afterTimestamp}`;
+    console.log('Gmail search query:', query);
+
     const response = await gapi.client.gmail.users.messages.list({
       userId: 'me',
-      q: `from:me subject:"session notes" to:${clientEmail} after:${afterTimestamp}`,
+      q: query,
       maxResults: 100,
     });
+
+    console.log('Gmail search results:', response.result.messages?.length || 0, 'messages found');
 
     const messages = response.result.messages || [];
     const emails: SessionNotesEmail[] = [];
@@ -419,9 +436,19 @@ export async function getAllSessionNotesEmailsForClient(clientEmail: string): Pr
     emails.sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
 
     return emails;
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Error fetching all session notes emails for client:', err);
-    throw err;
+    // Provide more useful error messages
+    if (err && typeof err === 'object' && 'result' in err) {
+      const gapiError = err as { result?: { error?: { message?: string } } };
+      if (gapiError.result?.error?.message) {
+        throw new Error(gapiError.result.error.message);
+      }
+    }
+    if (err instanceof Error) {
+      throw err;
+    }
+    throw new Error('Failed to fetch emails from Gmail');
   }
 }
 
