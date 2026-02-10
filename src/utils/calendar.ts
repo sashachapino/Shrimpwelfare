@@ -427,7 +427,8 @@ export async function getAllSessionNotesEmailsForClient(clientEmail: string): Pr
 
   // Check if Gmail API is available
   if (!gapi.client.gmail) {
-    throw new Error('Gmail API not loaded. Please reconnect your Google account.');
+    console.warn('Gmail API not loaded, skipping email fetch for client:', clientEmail);
+    return [];
   }
 
   try {

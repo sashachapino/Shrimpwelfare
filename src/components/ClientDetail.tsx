@@ -172,10 +172,14 @@ export function ClientDetail() {
 
     try {
       const result = await syncClientNotes(id);
-      if (result.error) {
+      if (result.imported === 0 && result.error) {
+        // Informational message (no emails found or all duplicates)
+        setSyncResult({ message: result.error, isError: false });
+      } else if (result.error) {
+        // Actual error
         setSyncResult({ message: result.error, isError: true });
       } else if (result.imported === 0) {
-        setSyncResult({ message: 'No new session notes found in email', isError: false });
+        setSyncResult({ message: 'No new session notes found', isError: false });
       } else {
         setSyncResult({ message: `Imported ${result.imported} session note${result.imported > 1 ? 's' : ''} from email`, isError: false });
         // Refresh the form data from the updated client
