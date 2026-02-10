@@ -283,3 +283,181 @@ export async function restoreFromBackup(file: File, password: string): Promise<v
 
   await importEncryptedBackup(backup, password);
 }
+
+// ============================================
+// CSV Import for migrating from other CRMs
+// ============================================
+
+interface CsvRow {
+  [key: string]: string;
+}
+
+function parseCSV(csvText: string): CsvRow[] {
+  const lines = csvText.split(/\r?\n/).filter(line => line.trim());
+  if (lines.length < 2) return [];
+
+  // Parse header row - handle quoted fields
+  const parseRow = (row: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < row.length; i++) {
+      const char = row[i];
+      if (char === '"') {
+        if (inQuotes && row[i + 1] === '"') {
+          current += '"';
+          i++; // Skip escaped quote
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const headers = parseRow(lines[0]).map(h => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const rows: CsvRow[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseRow(lines[i]);
+    const row: CsvRow = {};
+    headers.forEach((header, index) => {
+      row[header] = values[index] || '';
+    });
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+// Map common CRM field names to our Client fields
+function findField(row: CsvRow, ...possibleNames: string[]): string {
+  for (const name of possibleNames) {
+    const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (row[key] !== undefined && row[key] !== '') {
+      return row[key];
+    }
+  }
+  return '';
+}
+
+function parseEnneagramType(value: string): Client['enneagramType'] {
+  const num = parseInt(value, 10);
+  if (num >= 1 && num <= 9) return num as Client['enneagramType'];
+  return '?';
+}
+
+function parseStatus(value: string): Client['status'] {
+  const lower = value.toLowerCase();
+  if (lower.includes('archive') || lower.includes('inactive') || lower.includes('former')) {
+    return 'archived';
+  }
+  if (lower.includes('occasional') || lower.includes('pause') || lower.includes('sporadic')) {
+    return 'occasional';
+  }
+  return 'active';
+}
+
+export interface CsvImportResult {
+  clients: Client[];
+  warnings: string[];
+}
+
+export function parseClientsFromCSV(csvText: string, existingClients: Client[]): CsvImportResult {
+  const rows = parseCSV(csvText);
+  const warnings: string[] = [];
+  const clients: Client[] = [];
+  const existingEmails = new Set(existingClients.map(c => c.email.toLowerCase()));
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+
+    // Try to find name - required field
+    const name = findField(row,
+      'name', 'fullname', 'full_name', 'clientname', 'client_name',
+      'firstname', 'first_name', 'contact', 'client'
+    );
+
+    if (!name) {
+      warnings.push(`Row ${i + 2}: Skipped - no name found`);
+      continue;
+    }
+
+    // Try to find email
+    const email = findField(row,
+      'email', 'emailaddress', 'email_address', 'mail', 'contact_email'
+    );
+
+    // Check for duplicates
+    if (email && existingEmails.has(email.toLowerCase())) {
+      warnings.push(`Row ${i + 2}: "${name}" skipped - email already exists`);
+      continue;
+    }
+
+    // Parse other fields with sensible defaults
+    const enneagramRaw = findField(row,
+      'enneagram', 'enneagramtype', 'enneagram_type', 'type', 'enneatype'
+    );
+
+    const statusRaw = findField(row,
+      'status', 'clientstatus', 'client_status', 'state', 'active'
+    );
+
+    const sessionsRaw = findField(row,
+      'sessions', 'sessionscompleted', 'sessions_completed', 'totalsessions', 'session_count'
+    );
+
+    const rateRaw = findField(row,
+      'rate', 'hourlyrate', 'hourly_rate', 'price', 'fee'
+    );
+
+    const notes = findField(row,
+      'notes', 'overallnotes', 'overall_notes', 'comments', 'description', 'bio'
+    );
+
+    const now = new Date().toISOString();
+    const client: Client = {
+      id: crypto.randomUUID(),
+      name,
+      email: email || '',
+      enneagramType: parseEnneagramType(enneagramRaw),
+      enneagramSecondary: null,
+      status: parseStatus(statusRaw),
+      sessionsCompleted: parseInt(sessionsRaw, 10) || 0,
+      unpaidHours: 0,
+      hourlyRate: parseFloat(rateRaw) || 0,
+      sessionNotes: [],
+      overallNotes: notes,
+      currentQuestions: '',
+      allianceStrength: 5,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    clients.push(client);
+    if (email) existingEmails.add(email.toLowerCase());
+  }
+
+  return { clients, warnings };
+}
+
+export async function importClientsFromCSV(
+  csvText: string,
+  password: string,
+  mergeWithExisting: boolean = true
+): Promise<CsvImportResult> {
+  const existingClients = mergeWithExisting ? await loadClients(password) : [];
+  const { clients: newClients, warnings } = parseClientsFromCSV(csvText, existingClients);
+
+  const allClients = [...existingClients, ...newClients];
+  await saveClients(allClients, password);
+
+  return { clients: newClients, warnings };
+}

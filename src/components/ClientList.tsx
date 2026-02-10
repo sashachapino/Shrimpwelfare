@@ -1,13 +1,13 @@
 import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive, Settings, Download, Upload, X, Cloud, CheckCircle2, Check, RefreshCw } from 'lucide-react';
+import { Plus, Search, Users, Lock, Mail, Calendar as CalendarIcon, DollarSign, Clock, ChevronDown, Archive, Settings, Download, Upload, X, CheckCircle2, Check, RefreshCw } from 'lucide-react';
 import { useApp } from '../contexts/AppContext';
 import { useCalendar } from '../contexts/CalendarContext';
 import { AllianceIndicator } from './AllianceIndicator';
 import { EnneagramIndicator } from './EnneagramIndicator';
 import { UpcomingCalls } from './UpcomingCalls';
 import { PostCallNotifications } from './PostCallNotifications';
-import { downloadBackup, restoreFromBackup, isElectron, getDropboxBackupPath, listDropboxBackups, restoreFromDropboxBackup } from '../utils/storage';
+import { downloadBackup, restoreFromBackup, importClientsFromCSV, type CsvImportResult } from '../utils/storage';
 import { ShrimpIcon } from './ShrimpIcon';
 import type { Client } from '../types';
 import styles from './ClientList.module.css';
@@ -70,7 +70,10 @@ export function ClientList() {
   const [showSettings, setShowSettings] = useState(false);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [csvImportResult, setCsvImportResult] = useState<CsvImportResult | null>(null);
+  const [csvImporting, setCsvImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const csvInputRef = useRef<HTMLInputElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
 
@@ -108,6 +111,33 @@ export function ClientList() {
     }
     // Reset file input
     e.target.value = '';
+  };
+
+  const handleCsvImportClick = () => {
+    csvInputRef.current?.click();
+  };
+
+  const handleCsvFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !password) return;
+
+    setCsvImporting(true);
+    setRestoreError(null);
+    try {
+      const csvText = await file.text();
+      const result = await importClientsFromCSV(csvText, password, true);
+      setCsvImportResult(result);
+      await reloadClients();
+      if (result.clients.length > 0) {
+        setBackupStatus(`Imported ${result.clients.length} client${result.clients.length > 1 ? 's' : ''} successfully!`);
+        setTimeout(() => setBackupStatus(null), 5000);
+      }
+    } catch (err) {
+      setRestoreError(err instanceof Error ? err.message : 'Failed to import CSV');
+    } finally {
+      setCsvImporting(false);
+      e.target.value = '';
+    }
   };
 
   // Filter out archived clients
@@ -390,6 +420,57 @@ export function ClientList() {
                   Backup files are fully encrypted with your password.
                   Safe to store in Dropbox, Google Drive, etc.
                 </p>
+              </div>
+
+              <div className={styles.settingsSection}>
+                <h3>Import from Other CRM</h3>
+                <p className={styles.settingsDescription}>
+                  Import clients from a CSV file exported from another CRM. The importer will try to map common field names automatically.
+                </p>
+                <p className={styles.csvFieldsNote}>
+                  Supported fields: name, email, enneagram type, status, sessions completed, hourly rate, notes
+                </p>
+
+                <div className={styles.backupActions}>
+                  <button
+                    onClick={handleCsvImportClick}
+                    className="btn-secondary"
+                    disabled={csvImporting}
+                  >
+                    <Upload size={18} />
+                    {csvImporting ? 'Importing...' : 'Import CSV'}
+                  </button>
+                  <input
+                    ref={csvInputRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={handleCsvFile}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+
+                {csvImportResult && (
+                  <div className={styles.csvImportResult}>
+                    {csvImportResult.clients.length > 0 ? (
+                      <p className={styles.csvSuccess}>
+                        <CheckCircle2 size={16} />
+                        Imported {csvImportResult.clients.length} client{csvImportResult.clients.length > 1 ? 's' : ''}
+                      </p>
+                    ) : (
+                      <p className={styles.csvWarning}>No clients were imported</p>
+                    )}
+                    {csvImportResult.warnings.length > 0 && (
+                      <details className={styles.csvWarnings}>
+                        <summary>{csvImportResult.warnings.length} warning{csvImportResult.warnings.length > 1 ? 's' : ''}</summary>
+                        <ul>
+                          {csvImportResult.warnings.map((w, i) => (
+                            <li key={i}>{w}</li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
