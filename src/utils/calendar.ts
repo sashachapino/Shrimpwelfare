@@ -309,7 +309,18 @@ export async function getPastEvents(
       .filter((event: gapi.client.calendar.Event) => {
         if (!event.attendees) return false;
         // Only include events that have already ended
-        const endTime = new Date(event.end?.dateTime || event.end?.date || '');
+        // For all-day events (date only, no time), treat as ended if the date is today or earlier
+        let endTime: Date;
+        if (event.end?.dateTime) {
+          endTime = new Date(event.end.dateTime);
+        } else if (event.end?.date) {
+          // All-day event: end date is exclusive (day after event)
+          // Parse as local midnight and subtract a day to get actual end
+          const [year, month, day] = event.end.date.split('-').map(Number);
+          endTime = new Date(year, month - 1, day - 1, 23, 59, 59);
+        } else {
+          return false;
+        }
         if (endTime > now) return false;
         return event.attendees.some(
           (attendee: gapi.client.calendar.EventAttendee) =>
