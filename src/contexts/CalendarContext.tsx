@@ -302,7 +302,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         const emails = await getAllSessionNotesEmailsForClient(client.email);
 
         if (emails.length === 0) {
-          return { imported: 0, error: 'No session notes emails found. Emails must have "session" and "notes" in the subject line.' };
+          return { imported: 0 };
         }
 
         // Filter out duplicate emails by checking content similarity
@@ -311,7 +311,7 @@ export function CalendarProvider({ children }: { children: ReactNode }) {
         });
 
         if (newEmails.length === 0) {
-          return { imported: 0, error: `Found ${emails.length} email(s) but all appear to already be imported.` };
+          return { imported: 0 };
         }
 
         // Create session notes from emails (temporary session numbers)
